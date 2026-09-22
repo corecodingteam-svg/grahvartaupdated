@@ -132,12 +132,12 @@ export function getBlogArticleBySlug(slug) {
   return blogArticles.find((a) => a.slug === slug)
 }
 
-export function getRelatedArticles(article, count = 3) {
+export function getRelatedArticles(article, pool = blogArticles, count = 3) {
   if (!article) return []
-  const sameCategory = blogArticles.filter(
+  const sameCategory = pool.filter(
     (a) => a.slug !== article.slug && a.category === article.category
   )
-  const others = blogArticles.filter(
+  const others = pool.filter(
     (a) => a.slug !== article.slug && a.category !== article.category
   )
   return [...sameCategory, ...others].slice(0, count)

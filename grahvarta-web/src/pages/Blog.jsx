@@ -4,7 +4,7 @@ import { CalendarDays } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import SectionHeading from '../components/ui/SectionHeading'
-import { blogArticles, blogCategories } from '../data/blog'
+import { blogArticles as fallbackArticles, blogCategories } from '../data/blog'
 import { setPageMeta } from '../lib/demo'
 
 function formatDate(dateStr) {
@@ -13,6 +13,8 @@ function formatDate(dateStr) {
 
 export default function Blog() {
   const [category, setCategory] = useState('')
+  const [articles, setArticles] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setPageMeta({
@@ -21,10 +23,31 @@ export default function Blog() {
     })
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/blog')
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('request failed'))))
+      .then((data) => {
+        if (!cancelled) setArticles(data.articles)
+      })
+      .catch(() => {
+        if (!cancelled) setArticles(fallbackArticles)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const allArticles = articles || fallbackArticles
+
   const filtered = useMemo(() => {
-    if (!category) return blogArticles
-    return blogArticles.filter((a) => a.category === category)
-  }, [category])
+    if (!category) return allArticles
+    return allArticles.filter((a) => a.category === category)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, allArticles])
 
   return (
     <div className="container-page py-8 sm:py-12">
@@ -59,7 +82,13 @@ export default function Blog() {
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className="h-72 animate-pulse" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="card text-center py-16">
           <p className="text-text-secondary">No articles in this category yet.</p>
         </div>

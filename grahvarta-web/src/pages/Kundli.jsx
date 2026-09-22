@@ -46,7 +46,7 @@ export default function Kundli() {
             <ScrollText size={20} />
           </span>
           <p className="text-sm text-text-secondary">
-            All fields are required. This is a demo tool — results are for illustration only.
+            All fields are required.
           </p>
         </div>
 

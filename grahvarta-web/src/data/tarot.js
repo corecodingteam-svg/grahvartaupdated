@@ -5,6 +5,7 @@ export const tarotCards = [
   {
     id: 'seeker',
     name: 'The Seeker',
+    numeral: 'I',
     icon: 'Compass',
     gradient: 'from-orange to-gold',
     upright: 'A new path opens up. Curiosity and honest self-reflection lead you somewhere meaningful.',
@@ -13,6 +14,7 @@ export const tarotCards = [
   {
     id: 'lantern',
     name: 'The Lantern',
+    numeral: 'II',
     icon: 'Flame',
     gradient: 'from-gold to-orange-light',
     upright: 'Clarity arrives after a confusing period. Trust the insight that is coming into focus.',
@@ -21,6 +23,7 @@ export const tarotCards = [
   {
     id: 'twin-paths',
     name: 'Twin Paths',
+    numeral: 'III',
     icon: 'GitFork',
     gradient: 'from-orange to-orange-dark',
     upright: 'An important choice stands before you. Both options carry lessons worth having.',
@@ -29,6 +32,7 @@ export const tarotCards = [
   {
     id: 'anchor',
     name: 'The Anchor',
+    numeral: 'IV',
     icon: 'Anchor',
     gradient: 'from-gold to-orange',
     upright: 'Stability and loyalty support you now. A relationship or commitment holds firm.',
@@ -37,6 +41,7 @@ export const tarotCards = [
   {
     id: 'garden',
     name: 'The Garden',
+    numeral: 'V',
     icon: 'Sprout',
     gradient: 'from-orange-light to-gold',
     upright: 'Patient effort is quietly paying off. What you have nurtured is ready to grow.',
@@ -45,6 +50,7 @@ export const tarotCards = [
   {
     id: 'crown',
     name: 'The Crown',
+    numeral: 'VI',
     icon: 'Crown',
     gradient: 'from-gold to-orange-dark',
     upright: 'Recognition, achievement and confidence are within reach — step into your worth.',
@@ -53,6 +59,7 @@ export const tarotCards = [
   {
     id: 'mirror',
     name: 'The Mirror',
+    numeral: 'VII',
     icon: 'Sparkle',
     gradient: 'from-orange to-gold',
     upright: 'Self-awareness deepens. What you see in others often reflects something within you.',
@@ -61,6 +68,7 @@ export const tarotCards = [
   {
     id: 'storm',
     name: 'The Storm',
+    numeral: 'VIII',
     icon: 'CloudLightning',
     gradient: 'from-orange-dark to-orange',
     upright: 'Sudden change clears out what no longer serves you, even if it feels disruptive now.',
@@ -69,6 +77,7 @@ export const tarotCards = [
   {
     id: 'bridge',
     name: 'The Bridge',
+    numeral: 'IX',
     icon: 'Milestone',
     gradient: 'from-gold to-orange',
     upright: 'A connection, deal or reconciliation successfully brings two sides together.',
@@ -77,6 +86,7 @@ export const tarotCards = [
   {
     id: 'harvest',
     name: 'The Harvest',
+    numeral: 'X',
     icon: 'Wheat',
     gradient: 'from-orange-light to-orange',
     upright: 'Reward for sustained effort arrives — a fitting return on what you have invested.',
@@ -85,6 +95,7 @@ export const tarotCards = [
   {
     id: 'wanderer',
     name: 'The Wanderer',
+    numeral: 'XI',
     icon: 'Footprints',
     gradient: 'from-orange-dark to-gold',
     upright: 'Freedom and a fresh start are calling. Travel, literal or otherwise, brings growth.',
@@ -93,6 +104,7 @@ export const tarotCards = [
   {
     id: 'keystone',
     name: 'The Keystone',
+    numeral: 'XII',
     icon: 'KeyRound',
     gradient: 'from-orange to-gold',
     upright: 'A single decision or answer unlocks progress across several areas of life at once.',

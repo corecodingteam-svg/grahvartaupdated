@@ -1,42 +1,51 @@
 import { useEffect, useState } from 'react'
-import { Heart } from 'lucide-react'
+import { Heart, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import SectionHeading from '../components/ui/SectionHeading'
 import Card from '../components/ui/Card'
 import CompatibilityMeter from '../components/ui/CompatibilityMeter'
-import { hashString, setPageMeta } from '../lib/demo'
-
-function getInterpretation(score) {
-  if (score >= 71) {
-    return 'A wonderful match! There is strong natural chemistry here, with great potential for a lasting, joyful connection.'
-  }
-  if (score >= 41) {
-    return 'A promising connection. With good communication and effort from both sides, this bond can grow steadily stronger.'
-  }
-  return 'Every connection has room to grow. Differences here can turn into strengths with patience and understanding.'
-}
+import { setPageMeta } from '../lib/demo'
 
 export default function LoveCalculator() {
   const [name, setName] = useState('')
   const [partner, setPartner] = useState('')
   const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
     setPageMeta(
       'Love Calculator | GrahVarta',
-      'Calculate a fun compatibility score between you and your partner based on your names.'
+      'Calculate a fun compatibility score between you and your partner.'
     )
   }, [])
 
-  function handleCalculate(e) {
+  async function handleCalculate(e) {
     e.preventDefault()
     if (!name.trim() || !partner.trim()) {
       toast.error('Please enter both names.')
       return
     }
-    const seed = `${name.trim().toLowerCase()}::${partner.trim().toLowerCase()}`
-    const score = hashString(seed) % 101
-    setResult({ score, interpretation: getInterpretation(score) })
+
+    setLoading(true)
+    setError(false)
+    setResult(null)
+
+    try {
+      const res = await fetch('/api/love-calculator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), partner: partner.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'request failed')
+      setResult(data)
+    } catch {
+      setError(true)
+      toast.error('Could not reach the love calculator service — please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -45,7 +54,7 @@ export default function LoveCalculator() {
         level="h1"
         eyebrow="Just for Fun"
         title="Love Calculator"
-        subtitle="Enter two names to see a fun, demo compatibility score."
+        subtitle="Enter two names to see a fun compatibility score."
       />
 
       <div className="grid lg:grid-cols-2 gap-6 max-w-4xl">
@@ -54,7 +63,7 @@ export default function LoveCalculator() {
             <span className="w-11 h-11 rounded-xl bg-orange/10 flex items-center justify-center text-orange shrink-0">
               <Heart size={20} />
             </span>
-            <p className="text-sm text-text-secondary">This is a fun demo tool — results are for entertainment only.</p>
+            <p className="text-sm text-text-secondary">Just for fun — not real astrology.</p>
           </div>
           <form onSubmit={handleCalculate} className="flex flex-col gap-4">
             <div>
@@ -81,8 +90,9 @@ export default function LoveCalculator() {
                 required
               />
             </div>
-            <button type="submit" className="btn-primary w-full mt-2">
-              Calculate
+            <button type="submit" className="btn-primary w-full mt-2 inline-flex items-center justify-center gap-2" disabled={loading}>
+              {loading && <Loader2 size={16} className="animate-spin" />}
+              {loading ? 'Calculating…' : 'Calculate'}
             </button>
           </form>
         </Card>
@@ -92,6 +102,17 @@ export default function LoveCalculator() {
             <>
               <CompatibilityMeter percentage={result.score} label="Match" />
               <p className="text-sm text-text-secondary leading-relaxed max-w-xs">{result.interpretation}</p>
+              {result.strengths?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 justify-center">
+                  {result.strengths.map((s) => (
+                    <span key={s} className="text-[11px] px-2 py-1 rounded-full bg-surface-light text-text-secondary">{s}</span>
+                  ))}
+                </div>
+              )}
+              {result.tip && <p className="text-sm text-gold font-medium leading-relaxed max-w-xs">✦ {result.tip}</p>}
+              {error && (
+                <p className="text-xs text-text-muted">Live reading unavailable — try again shortly.</p>
+              )}
             </>
           ) : (
             <p className="text-sm text-text-muted">Enter both names and hit calculate to see your result.</p>

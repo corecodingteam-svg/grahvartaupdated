@@ -30,9 +30,39 @@ export const zodiacSigns = [
 ]
 
 export const testimonials = [
-  { id: 1, name: 'Ritika S.', text: 'The consultation gave me so much clarity about my career path. Highly recommend!', rating: 5, city: 'Pune' },
-  { id: 2, name: 'Ankit V.', text: 'Very insightful kundli matching session before our marriage. Loved the detailed explanation.', rating: 5, city: 'Delhi' },
-  { id: 3, name: 'Meera J.', text: 'Quick, honest and supportive guidance during a tough time in my life.', rating: 4, city: 'Ahmedabad' },
-  { id: 4, name: 'Suresh K.', text: 'The astrologer explained my chart in simple terms. Felt genuinely helpful.', rating: 5, city: 'Bengaluru' },
-  { id: 5, name: 'Priya D.', text: 'Loved the tarot session — accurate and reassuring.', rating: 4, city: 'Mumbai' },
+  {
+    id: 1,
+    name: 'Ritika S.',
+    text: 'The consultation gave me so much clarity about my career path. I had been stuck between two job offers for weeks, and the astrologer walked me through my chart in a way that finally made sense. Booking was quick and the chat interface felt smooth even during peak hours. Highly recommend to anyone feeling stuck on a big decision.',
+    rating: 5,
+    city: 'Pune',
+  },
+  {
+    id: 2,
+    name: 'Ankit V.',
+    text: 'Very insightful kundli matching session before our marriage. The astrologer went through each Koota one by one and explained exactly why our scores looked the way they did, instead of just reading out a number. It genuinely eased some of the worries both our families had. We ended up booking a follow-up session too.',
+    rating: 5,
+    city: 'Delhi',
+  },
+  {
+    id: 3,
+    name: 'Meera J.',
+    text: 'Quick, honest and supportive guidance during a tough time in my life. I reached out during a particularly stressful week and got connected almost instantly. The astrologer was patient, never rushed me, and offered practical remedies rather than vague reassurances. It made a real difference to how I approached the following month.',
+    rating: 4,
+    city: 'Ahmedabad',
+  },
+  {
+    id: 4,
+    name: 'Suresh K.',
+    text: 'The astrologer explained my chart in simple terms without any of the jargon I was expecting. As someone completely new to Vedic astrology, I appreciated how patiently every planet placement and house was broken down for me. Felt genuinely helpful rather than a generic reading, and I now understand my own chart much better.',
+    rating: 5,
+    city: 'Bengaluru',
+  },
+  {
+    id: 5,
+    name: 'Priya D.',
+    text: 'Loved the tarot session — accurate and reassuring from the very first card. I went in a bit skeptical, but the reading tied together things happening in my life in a way that felt surprisingly specific. The astrologer also gave me a few gentle pointers for the weeks ahead that turned out to be spot on.',
+    rating: 4,
+    city: 'Mumbai',
+  },
 ]

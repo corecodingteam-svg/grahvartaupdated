@@ -1,13 +1,8 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Sunrise, Sunset, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import SectionHeading from '../components/ui/SectionHeading'
 import Card from '../components/ui/Card'
-import { hashString, pickFromHash, setPageMeta } from '../lib/demo'
-
-const tithis = ['Pratipada', 'Dwitiya', 'Tritiya', 'Chaturthi', 'Panchami', 'Shashthi', 'Saptami', 'Ashtami', 'Navami', 'Dashami']
-const nakshatraOptions = ['Rohini', 'Hasta', 'Swati', 'Pushya', 'Anuradha', 'Shravana', 'Uttara Ashadha']
-const yogas = ['Vishkambha', 'Priti', 'Ayushman', 'Saubhagya', 'Shobhana', 'Siddhi', 'Shukla']
-const karanas = ['Bava', 'Balava', 'Kaulava', 'Taitila', 'Garaja', 'Vanija', 'Vishti']
+import { setPageMeta } from '../lib/demo'
 
 export default function Panchang() {
   const today = useMemo(() => new Date(), [])
@@ -16,20 +11,9 @@ export default function Panchang() {
     [today]
   )
 
-  const seed = useMemo(() => today.toISOString().slice(0, 10), [today])
-
-  const panchang = useMemo(() => {
-    const h = hashString(seed)
-    return {
-      tithi: pickFromHash(h, tithis),
-      nakshatra: pickFromHash(hashString(`${seed}-nak`), nakshatraOptions),
-      yoga: pickFromHash(hashString(`${seed}-yoga`), yogas),
-      karana: pickFromHash(hashString(`${seed}-karana`), karanas),
-      sunrise: '06:14 AM',
-      sunset: '06:32 PM',
-      rahuKaal: '04:30 PM – 06:00 PM',
-    }
-  }, [seed])
+  const [panchang, setPanchang] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
     setPageMeta(
@@ -38,9 +22,44 @@ export default function Panchang() {
     )
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/panchang')
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('request failed'))))
+      .then((data) => {
+        if (!cancelled) setPanchang(data)
+      })
+      .catch(() => {
+        if (!cancelled) setError(true)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="container-page py-24 flex flex-col items-center justify-center text-center gap-4 min-h-[40vh]">
+        <span className="w-12 h-12 rounded-full border-4 border-surface-light border-t-orange animate-spin" />
+        <p className="text-sm text-text-secondary animate-pulse">Reading today's Panchang…</p>
+      </div>
+    )
+  }
+
+  if (!panchang) {
+    return (
+      <div className="container-page py-24 text-center">
+        <p className="text-sm text-text-muted">Panchang is temporarily unavailable — please try again shortly.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="container-page py-8 sm:py-12">
-      <SectionHeading level="h1" eyebrow={dateLabel} title="Today's Panchang" subtitle="Daily auspicious timing overview (demo data)." />
+      <SectionHeading level="h1" eyebrow={dateLabel} title="Today's Panchang" subtitle="Daily auspicious timing overview." />
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card className="text-center">
@@ -99,11 +118,18 @@ export default function Panchang() {
           </span>
           <div>
             <p className="text-sm font-semibold mb-1">Abhijit Muhurat (Auspicious)</p>
-            <p className="text-sm text-text-secondary">11:48 AM – 12:36 PM</p>
+            <p className="text-sm text-text-secondary">{panchang.abhijitMuhurat}</p>
             <p className="text-xs text-text-muted mt-1">A generally favourable window for important tasks.</p>
           </div>
         </Card>
       </div>
+
+      {panchang.dayQuality && (
+        <Card className="mt-6">
+          <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">Today's Outlook</h3>
+          <p className="text-sm text-text-secondary leading-relaxed">{panchang.dayQuality}</p>
+        </Card>
+      )}
     </div>
   )
 }

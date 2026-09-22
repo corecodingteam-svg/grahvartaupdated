@@ -1,7 +1,8 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import Layout from './components/layout/Layout'
+import ZodiacLoader from './components/ui/ZodiacLoader'
 
 const Home = lazy(() => import('./pages/Home'))
 const Astrologers = lazy(() => import('./pages/Astrologers'))
@@ -52,13 +53,31 @@ function PageLoader() {
   )
 }
 
+const BOOT_SPLASH_MS = 500
+
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), BOOT_SPLASH_MS)
+    return () => clearTimeout(timer)
+  }, [])
+
   return (
     <>
+      {showSplash && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
+          <ZodiacLoader label="Loading GrahVarta" />
+        </div>
+      )}
       <Toaster
         position="top-center"
         toastOptions={{
-          style: { background: '#1E1E1E', color: '#FFFFFF', border: '1px solid #2A2A2A' },
+          style: {
+            background: 'rgb(var(--color-card))',
+            color: 'rgb(var(--color-text-primary))',
+            border: '1px solid rgb(var(--color-border))',
+          },
         }}
       />
       <Suspense fallback={<PageLoader />}>

@@ -1,9 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { ArrowLeft, CalendarDays } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
-import { getBlogArticleBySlug, getRelatedArticles } from '../data/blog'
+import { getBlogArticleBySlug, getRelatedArticles, blogArticles as fallbackArticles } from '../data/blog'
 import { setPageMeta } from '../lib/demo'
 
 function formatDate(dateStr) {
@@ -12,8 +12,34 @@ function formatDate(dateStr) {
 
 export default function BlogArticle() {
   const { slug } = useParams()
-  const article = getBlogArticleBySlug(slug)
-  const related = getRelatedArticles(article)
+  const staticArticle = getBlogArticleBySlug(slug)
+
+  const [allArticles, setAllArticles] = useState(null)
+  const [loading, setLoading] = useState(!staticArticle)
+
+  useEffect(() => {
+    // Static articles render instantly with no network dependency — only a
+    // slug outside the hand-written set (an auto-published one) needs the fetch.
+    if (staticArticle) return
+    let cancelled = false
+    fetch('/api/blog')
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('request failed'))))
+      .then((data) => {
+        if (!cancelled) setAllArticles(data.articles)
+      })
+      .catch(() => {
+        if (!cancelled) setAllArticles(fallbackArticles)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [slug, staticArticle])
+
+  const article = staticArticle || allArticles?.find((a) => a.slug === slug)
+  const related = getRelatedArticles(article, allArticles || fallbackArticles)
 
   useEffect(() => {
     if (article) {
@@ -25,6 +51,15 @@ export default function BlogArticle() {
       })
     }
   }, [article])
+
+  if (loading) {
+    return (
+      <div className="container-page py-24 flex flex-col items-center justify-center text-center gap-4 min-h-[40vh]">
+        <span className="w-12 h-12 rounded-full border-4 border-surface-light border-t-orange animate-spin" />
+        <p className="text-sm text-text-secondary animate-pulse">Loading article…</p>
+      </div>
+    )
+  }
 
   if (!article) {
     return <Navigate to="/blog" replace />

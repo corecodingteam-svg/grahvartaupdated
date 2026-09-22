@@ -101,7 +101,7 @@ export default function KundliMatching() {
             <HeartHandshake size={20} />
           </span>
           <p className="text-sm text-text-secondary">
-            This is a demo tool — results are for illustration only.
+            Get your Ashtakoot Guna Milan compatibility score out of 36.
           </p>
         </div>
         <div className="grid md:grid-cols-2 gap-6">

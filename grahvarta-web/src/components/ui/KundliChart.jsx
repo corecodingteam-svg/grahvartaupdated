@@ -25,9 +25,14 @@ export default function KundliChart({ houses = [] }) {
           <div
             key={house}
             style={{ gridArea: area }}
-            className="bg-card rounded-lg flex flex-col items-center justify-center gap-1 p-1 border border-border"
+            className={`bg-card rounded-lg flex flex-col items-center justify-center gap-1 p-1 border ${
+              house === 1 ? 'border-orange/60' : 'border-border'
+            }`}
           >
-            <span className="text-[10px] text-text-muted">{house}</span>
+            <span className="text-[10px] text-text-muted">
+              {house}
+              {houseData?.sign && <span className="hidden sm:inline"> · {houseData.sign.slice(0, 3)}</span>}
+            </span>
             <div className="flex flex-wrap items-center justify-center gap-1">
               {houseData?.planets.length ? (
                 houseData.planets.map((abbr) => (

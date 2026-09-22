@@ -1,26 +1,111 @@
-import { useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
-import { Menu, X, Sparkles, ShoppingCart } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Link, NavLink, useLocation } from 'react-router-dom'
+import {
+  Menu, X, Sparkles, ShoppingCart, Sun, Moon, ChevronDown,
+  ScrollText, HeartHandshake, Hash, Home as HomeIcon, CalendarDays, Clock,
+} from 'lucide-react'
 import { useCart } from '../../context/CartContext'
+import { useTheme } from '../../context/ThemeContext'
 
-const navLinks = [
+const primaryLinks = [
   { label: 'Home', to: '/' },
   { label: 'Astrologers', to: '/astrologers' },
-  { label: 'Kundli', to: '/kundli' },
-  { label: 'Horoscope', to: '/horoscope' },
-  { label: 'Kundli Matching', to: '/kundli-matching' },
-  { label: 'Tarot', to: '/tarot' },
-  { label: 'Numerology', to: '/numerology' },
-  { label: 'Vastu', to: '/vastu' },
-  { label: 'Panchang', to: '/panchang' },
-  { label: 'Muhurat', to: '/muhurat' },
+]
+
+const toolLinks = [
+  { label: 'Kundli', to: '/kundli', icon: ScrollText },
+  { label: 'Kundli Matching', to: '/kundli-matching', icon: HeartHandshake },
+  { label: 'Horoscope', to: '/horoscope', icon: Sun },
+  { label: 'Tarot', to: '/tarot', icon: Sparkles },
+  { label: 'Numerology', to: '/numerology', icon: Hash },
+  { label: 'Vastu', to: '/vastu', icon: HomeIcon },
+  { label: 'Panchang', to: '/panchang', icon: CalendarDays },
+  { label: 'Muhurat', to: '/muhurat', icon: Clock },
+]
+
+const trailingLinks = [
   { label: 'Puja', to: '/puja' },
   { label: 'Shop', to: '/shop' },
 ]
 
+const navLinkClass = ({ isActive }) =>
+  `px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
+    isActive ? 'text-orange bg-orange/10' : 'text-text-secondary hover:text-text-primary hover:bg-surface-light'
+  }`
+
+function ToolsDropdown() {
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef(null)
+  const location = useLocation()
+  const isToolsActive = toolLinks.some((l) => location.pathname.startsWith(l.to))
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false)
+      }
+    }
+    function handleEscape(e) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [])
+
+  useEffect(() => {
+    setOpen(false)
+  }, [location.pathname])
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={`inline-flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
+          isToolsActive || open
+            ? 'text-orange bg-orange/10'
+            : 'text-text-secondary hover:text-text-primary hover:bg-surface-light'
+        }`}
+      >
+        Tools
+        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute left-0 top-full mt-2 w-[420px] p-3 rounded-2xl border border-border bg-card shadow-xl grid grid-cols-2 gap-1 animate-fade-in"
+        >
+          {toolLinks.map(({ label, to, icon: Icon }) => (
+            <Link
+              key={to}
+              to={to}
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-text-secondary hover:text-text-primary hover:bg-surface-light transition-colors"
+            >
+              <span className="w-8 h-8 rounded-lg bg-orange/10 flex items-center justify-center text-orange shrink-0">
+                <Icon size={15} />
+              </span>
+              {label}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Header() {
   const [open, setOpen] = useState(false)
   const { totalItems } = useCart()
+  const { isLight, toggleTheme } = useTheme()
 
   return (
     <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
@@ -34,23 +119,29 @@ export default function Header() {
           </span>
         </Link>
 
-        <nav className="hidden lg:flex items-center gap-1 overflow-x-auto" aria-label="Primary">
-          {navLinks.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              className={({ isActive }) =>
-                `px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
-                  isActive ? 'text-orange bg-orange/10' : 'text-text-secondary hover:text-text-primary hover:bg-surface-light'
-                }`
-              }
-            >
+        <nav className="hidden lg:flex items-center gap-1" aria-label="Primary">
+          {primaryLinks.map((link) => (
+            <NavLink key={link.to} to={link.to} className={navLinkClass}>
+              {link.label}
+            </NavLink>
+          ))}
+          <ToolsDropdown />
+          {trailingLinks.map((link) => (
+            <NavLink key={link.to} to={link.to} className={navLinkClass}>
               {link.label}
             </NavLink>
           ))}
         </nav>
 
         <div className="hidden lg:flex items-center gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-2 rounded-xl hover:bg-surface-light text-text-secondary hover:text-text-primary transition-colors"
+            aria-label={isLight ? 'Switch to dark theme' : 'Switch to day theme'}
+          >
+            {isLight ? <Moon size={20} /> : <Sun size={20} />}
+          </button>
           <Link
             to="/cart"
             className="relative p-2 rounded-xl hover:bg-surface-light text-text-secondary hover:text-text-primary transition-colors"
@@ -69,6 +160,14 @@ export default function Header() {
         </div>
 
         <div className="lg:hidden flex items-center gap-1">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-2 rounded-xl hover:bg-surface-light text-text-secondary"
+            aria-label={isLight ? 'Switch to dark theme' : 'Switch to day theme'}
+          >
+            {isLight ? <Moon size={20} /> : <Sun size={20} />}
+          </button>
           <Link
             to="/cart"
             className="relative p-2 rounded-xl hover:bg-surface-light text-text-secondary"
@@ -94,9 +193,42 @@ export default function Header() {
       </div>
 
       {open && (
-        <div className="lg:hidden border-t border-border bg-background">
+        <div className="lg:hidden border-t border-border bg-background max-h-[calc(100vh-4rem)] overflow-y-auto">
           <nav className="container-page flex flex-col py-3" aria-label="Mobile">
-            {navLinks.map((link) => (
+            {primaryLinks.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                onClick={() => setOpen(false)}
+                className={({ isActive }) =>
+                  `px-2 py-3 rounded-xl text-sm font-medium border-b border-divider ${
+                    isActive ? 'text-orange' : 'text-text-secondary'
+                  }`
+                }
+              >
+                {link.label}
+              </NavLink>
+            ))}
+
+            <p className="px-2 pt-4 pb-1 text-xs font-semibold text-text-muted uppercase tracking-wide">
+              Astrology Tools
+            </p>
+            {toolLinks.map(({ label, to, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                onClick={() => setOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-2.5 px-2 py-3 rounded-xl text-sm font-medium border-b border-divider ${
+                    isActive ? 'text-orange' : 'text-text-secondary'
+                  }`
+                }
+              >
+                <Icon size={16} className="shrink-0" /> {label}
+              </NavLink>
+            ))}
+
+            {trailingLinks.map((link) => (
               <NavLink
                 key={link.to}
                 to={link.to}
@@ -110,6 +242,7 @@ export default function Header() {
                 {link.label}
               </NavLink>
             ))}
+
             <Link
               to="/astrologers"
               onClick={() => setOpen(false)}

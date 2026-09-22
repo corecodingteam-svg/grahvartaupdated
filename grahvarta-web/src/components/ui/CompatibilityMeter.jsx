@@ -7,7 +7,7 @@ export default function CompatibilityMeter({ percentage = 0, label, className = 
     <div className={`flex flex-col items-center gap-4 ${className}`}>
       <div className="relative w-40 h-40 sm:w-48 sm:h-48">
         <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
-          <circle cx="60" cy="60" r="52" fill="none" stroke="#2A2A2A" strokeWidth="12" />
+          <circle cx="60" cy="60" r="52" fill="none" stroke="rgb(var(--color-border))" strokeWidth="12" />
           <circle
             cx="60"
             cy="60"

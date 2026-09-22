@@ -18,6 +18,9 @@ export default function HoroscopeDetail() {
   const { sign } = useParams()
   const zodiac = getZodiacById(sign)
   const [period, setPeriod] = useState('today')
+  const [aiResult, setAiResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
     if (zodiac) {
@@ -28,12 +31,54 @@ export default function HoroscopeDetail() {
     }
   }, [zodiac])
 
+  useEffect(() => {
+    if (!zodiac) return
+    let cancelled = false
+    setLoading(true)
+    setError(false)
+    setAiResult(null)
+
+    fetch('/api/horoscope', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sign: zodiac.label,
+        period,
+        element: zodiac.element,
+        rulingPlanet: zodiac.rulingPlanet,
+      }),
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('request failed'))))
+      .then((data) => {
+        if (!cancelled) setAiResult(data)
+      })
+      .catch(() => {
+        // Gemini-backed API server isn't reachable or failed — the static
+        // fallback below keeps the page usable either way.
+        if (!cancelled) setError(true)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [zodiac, period])
+
   if (!zodiac) {
     return <Navigate to="/horoscope" replace />
   }
 
-  const lucky = getLuckyDetails(zodiac.id)
-  const blurb = getHoroscopeContent(zodiac.id, period)
+  const fallbackLucky = getLuckyDetails(zodiac.id)
+  const fallbackBlurb = getHoroscopeContent(zodiac.id, period)
+
+  const blurb = aiResult?.horoscope || fallbackBlurb
+  const lucky = {
+    number: aiResult?.luckyNumber ?? fallbackLucky.number,
+    color: aiResult?.luckyColor ?? fallbackLucky.color,
+    day: aiResult?.luckyDay ?? fallbackLucky.day,
+  }
 
   return (
     <div className="container-page py-8 sm:py-12">
@@ -68,7 +113,16 @@ export default function HoroscopeDetail() {
               </button>
             ))}
           </div>
-          <p className="text-sm sm:text-base text-text-secondary leading-relaxed">{blurb}</p>
+          {loading && !aiResult ? (
+            <p className="text-sm sm:text-base text-text-muted leading-relaxed animate-pulse">Consulting the stars…</p>
+          ) : (
+            <p className="text-sm sm:text-base text-text-secondary leading-relaxed">{blurb}</p>
+          )}
+          {error && (
+            <p className="text-xs text-text-muted mt-3">
+              Showing a saved reading — live horoscope is temporarily unavailable.
+            </p>
+          )}
         </Card>
 
         <Card>

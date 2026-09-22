@@ -3,17 +3,17 @@ import { Link } from 'react-router-dom'
 import {
   MessageCircle, Phone, Sun, ScrollText, Heart, Gem, Briefcase, UserRound,
   TrendingUp, HeartPulse, Sparkles, Flame, Hash, Home as HomeIcon,
-  HeartHandshake, Orbit, CalendarDays, Clock, Quote,
+  HeartHandshake, Orbit, CalendarDays, Clock,
+  ShieldCheck, Signal, Wifi, BatteryFull, ChevronLeft, BadgeCheck, Send,
 } from 'lucide-react'
 import SectionHeading from '../components/ui/SectionHeading'
-import Card from '../components/ui/Card'
-import StarRating from '../components/ui/StarRating'
 import AstrologerCard from '../components/astrologer/AstrologerCard'
+import TestimonialSlider from '../components/ui/TestimonialSlider'
 import { astrologers } from '../data/astrologers'
 import { categories } from '../data/categories'
 import { services, zodiacSigns, testimonials } from '../data/services'
 import { blogArticles } from '../data/blog'
-import { setPageMeta } from '../lib/demo'
+import { demoOnly, setPageMeta } from '../lib/demo'
 
 const categoryIcons = { Heart, Gem, Briefcase, UserRound, TrendingUp, HeartPulse }
 const serviceIcons = {
@@ -165,7 +165,7 @@ export default function Home() {
           {zodiacSigns.map((sign) => (
             <Link
               key={sign.id}
-              to="/horoscope"
+              to={`/horoscope/${sign.id}`}
               className="card flex flex-col items-center text-center gap-1 py-5 hover:border-gold/50 transition-colors"
             >
               <span className="text-2xl text-gold" aria-hidden="true">{sign.symbol}</span>
@@ -178,20 +178,117 @@ export default function Home() {
       {/* Testimonials */}
       <section className="container-page py-10 sm:py-14">
         <SectionHeading eyebrow="Reviews" title="What our users say" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {testimonials.map((t) => (
-            <Card key={t.id} className="flex flex-col gap-3">
-              <Quote size={20} className="text-orange" aria-hidden="true" />
-              <p className="text-sm text-text-secondary leading-relaxed">{t.text}</p>
-              <div className="flex items-center justify-between mt-auto pt-2">
-                <div>
-                  <p className="text-sm font-semibold">{t.name}</p>
-                  <p className="text-xs text-text-muted">{t.city}</p>
+        <TestimonialSlider items={testimonials} />
+      </section>
+
+      {/* App download */}
+      <section className="container-page py-10 sm:py-16">
+        <div className="relative overflow-hidden rounded-3xl border border-border">
+          <div className="absolute inset-0 bg-gradient-to-br from-orange/10 via-transparent to-gold/10" aria-hidden="true" />
+          <div className="relative grid lg:grid-cols-2 gap-10 items-center p-8 sm:p-12">
+            <div>
+              <p className="text-orange text-xs sm:text-sm font-semibold uppercase tracking-wide mb-3">
+                The GrahVarta App
+              </p>
+              <h2 className="text-3xl sm:text-4xl font-extrabold leading-tight mb-4">
+                Astrology made simpler, and available to you <span className="text-orange">24&times;7</span>.
+              </h2>
+              <p className="text-text-secondary text-sm sm:text-base mb-6 max-w-md">
+                Connect with an astrologer anytime, and find the solutions to all your love, marriage, career and
+                finance related problems instantly.
+              </p>
+              <div className="flex flex-col gap-3 mb-7">
+                <div className="flex items-center gap-3">
+                  <span className="w-9 h-9 rounded-xl bg-card border border-border flex items-center justify-center text-orange shrink-0">
+                    <MessageCircle size={16} />
+                  </span>
+                  <span className="text-sm text-text-secondary">Instant chats, notifications, and alerts</span>
                 </div>
-                <StarRating rating={t.rating} showValue={false} />
+                <div className="flex items-center gap-3">
+                  <span className="w-9 h-9 rounded-xl bg-card border border-border flex items-center justify-center text-orange shrink-0">
+                    <ShieldCheck size={16} />
+                  </span>
+                  <span className="text-sm text-text-secondary">Secure payments, UPI, cards &amp; wallet, all encrypted</span>
+                </div>
               </div>
-            </Card>
-          ))}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => demoOnly('App download coming soon.')}
+                  aria-label="Download on the App Store"
+                  className="w-[168px] h-[46px] rounded-xl overflow-hidden bg-black hover:opacity-90 transition-opacity shrink-0"
+                  style={{
+                    backgroundImage: 'url(/badges/app-store.webp)',
+                    backgroundSize: '100% 100%',
+                    backgroundRepeat: 'no-repeat',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => demoOnly('App download coming soon.')}
+                  aria-label="Get it on Google Play"
+                  className="w-[168px] h-[46px] rounded-xl overflow-hidden bg-black hover:opacity-90 transition-opacity shrink-0"
+                  style={{
+                    backgroundImage: 'url(/badges/google-play.png)',
+                    backgroundSize: '100% 100%',
+                    backgroundRepeat: 'no-repeat',
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="relative hidden lg:flex justify-center">
+              <div className="w-72 h-72 rounded-full bg-orange/20 blur-3xl absolute" aria-hidden="true" />
+              <div className="relative w-72 h-[480px] rounded-[2.5rem] border-8 border-card bg-white shadow-2xl overflow-hidden text-slate-900">
+                <div className="absolute top-0 inset-x-0 h-7 flex justify-center z-10">
+                  <div className="w-28 h-5 bg-card rounded-b-2xl" />
+                </div>
+
+                <div className="flex items-center justify-between px-5 pt-3 pb-1 text-[11px] font-semibold">
+                  <span>9:41</span>
+                  <div className="flex items-center gap-1 text-slate-700">
+                    <Signal size={12} />
+                    <Wifi size={12} />
+                    <BatteryFull size={14} />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100">
+                  <ChevronLeft size={18} className="text-slate-500 shrink-0" />
+                  <span className="w-9 h-9 rounded-full bg-gradient-to-br from-orange to-gold flex items-center justify-center text-white text-xs font-bold ring-2 ring-success/50 shrink-0">
+                    AK
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold flex items-center gap-1 truncate">
+                      Acharya Kavita <BadgeCheck size={13} className="text-success shrink-0" />
+                    </p>
+                    <p className="text-[11px] text-slate-500">Online &middot; &#8377;25/min</p>
+                  </div>
+                  <span className="w-8 h-8 rounded-full bg-gold flex items-center justify-center text-white shrink-0">
+                    <Phone size={13} />
+                  </span>
+                </div>
+
+                <div className="px-4 py-4 flex flex-col gap-3 bg-[#faf7f2] min-h-[260px]">
+                  <span className="mx-auto text-[10px] text-slate-400 bg-white px-2.5 py-1 rounded-full border border-slate-100">
+                    Today &middot; 9:38 AM
+                  </span>
+                  <div className="ml-auto max-w-[80%] bg-gold/90 text-slate-900 text-xs leading-relaxed rounded-2xl rounded-tr-sm px-3.5 py-2.5 shadow-sm">
+                    When will I get married? My family keeps asking me.
+                  </div>
+                </div>
+
+                <div className="absolute bottom-0 inset-x-0 flex items-center gap-2 px-3 py-3 border-t border-slate-100 bg-white">
+                  <div className="flex-1 h-9 rounded-full bg-slate-100 px-3.5 flex items-center text-[11px] text-slate-400">
+                    Type a message&hellip;
+                  </div>
+                  <span className="w-9 h-9 rounded-full bg-orange flex items-center justify-center text-white shrink-0">
+                    <Send size={14} />
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
