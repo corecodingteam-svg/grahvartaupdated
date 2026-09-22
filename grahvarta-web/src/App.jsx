@@ -31,6 +31,7 @@ const ProductDetail = lazy(() => import('./pages/ProductDetail'))
 const Cart = lazy(() => import('./pages/Cart'))
 const Blog = lazy(() => import('./pages/Blog'))
 const BlogArticle = lazy(() => import('./pages/BlogArticle'))
+const StoryPrivacyPolicy = lazy(() => import('./pages/StoryPrivacyPolicy'))
 
 // Future-phase features get a nav link now, but route to ComingSoon so the
 // site never 404s while pages roll out incrementally.
@@ -62,6 +63,7 @@ export default function App() {
       />
       <Suspense fallback={<PageLoader />}>
         <Routes>
+          <Route path="/storyprivacypolicy" element={<StoryPrivacyPolicy />} />
           <Route element={<Layout />}>
             <Route path="/" element={<Home />} />
             <Route path="/astrologers" element={<Astrologers />} />
