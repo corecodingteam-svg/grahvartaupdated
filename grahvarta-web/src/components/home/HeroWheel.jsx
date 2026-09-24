@@ -3,69 +3,59 @@ import { Sparkles, Sun, ArrowRight } from 'lucide-react'
 import { zodiacSigns } from '../../data/services'
 import Avatar from '../ui/Avatar'
 
-// Decorative rotating zodiac wheel with two floating cards. The astrologer card
-// uses real data when one is online; otherwise it falls back to a static card.
-const R = 158
-const CENTER = 200
+// Decorative rotating zodiac wheel plus two floating cards. Built from plain
+// positioned elements (not SVG text) so each sign can counter-rotate and stay
+// upright. The astrologer card uses real data when someone is online.
+const SIGN_RADIUS = 46 // % of the wheel box
+
+function place(angleRad, radiusPct) {
+  return {
+    left: `${50 + radiusPct * Math.cos(angleRad)}%`,
+    top: `${50 + radiusPct * Math.sin(angleRad)}%`,
+  }
+}
 
 export default function HeroWheel({ astrologer }) {
   return (
-    <div className="relative mx-auto w-full max-w-[460px] aspect-square">
-      <div className="absolute inset-6 rounded-full bg-orange/25 blur-3xl animate-glow" aria-hidden="true" />
+    <div className="relative mx-auto w-full max-w-[500px] aspect-square">
+      <div className="absolute inset-[10%] rounded-full bg-orange/25 blur-3xl animate-glow" aria-hidden="true" />
 
-      <svg viewBox="0 0 400 400" className="relative w-full h-full" role="img" aria-label="Zodiac wheel">
-        <defs>
-          <radialGradient id="hw-core" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#F08C3E" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#E8762A" stopOpacity="0.15" />
-          </radialGradient>
-        </defs>
+      {/* Wheel */}
+      <div className="absolute inset-[8%]" aria-hidden="true">
+        <div className="absolute inset-0 rounded-full border border-dashed border-orange/40" />
 
-        <g className="animate-spin-slow" style={{ transformOrigin: '200px 200px' }}>
-          <circle cx={CENTER} cy={CENTER} r="188" fill="none" stroke="#E8762A" strokeOpacity="0.35" strokeWidth="1.5" strokeDasharray="2 8" />
-          <circle cx={CENTER} cy={CENTER} r="128" fill="none" stroke="#D4A843" strokeOpacity="0.5" strokeWidth="1.5" />
+        {/* Sign ring */}
+        <div className="absolute inset-0 animate-spin-slow">
           {zodiacSigns.map((sign, i) => {
             const angle = (i / zodiacSigns.length) * Math.PI * 2 - Math.PI / 2
-            const x = CENTER + R * Math.cos(angle)
-            const y = CENTER + R * Math.sin(angle)
             return (
-              <g key={sign.id}>
-                <circle cx={x} cy={y} r="19" fill="rgb(var(--color-card))" stroke="#E8762A" strokeOpacity="0.4" />
-                <text
-                  x={x}
-                  y={y}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fontSize="19"
-                  fill="#D4A843"
-                  className="animate-spin-slow-reverse"
-                  style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
-                >
-                  {sign.symbol}
-                </text>
-              </g>
+              <div key={sign.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={place(angle, SIGN_RADIUS)}>
+                <span className="animate-spin-slow-reverse flex w-10 h-10 items-center justify-center rounded-full bg-card border border-orange/30 shadow-sm text-xl text-gold">
+                  {sign.symbol}&#xFE0E;
+                </span>
+              </div>
             )
           })}
-        </g>
+        </div>
 
-        <g className="animate-spin-mid-reverse" style={{ transformOrigin: '200px 200px' }}>
-          <circle cx={CENTER} cy={CENTER} r="88" fill="none" stroke="#E8762A" strokeOpacity="0.3" strokeWidth="1.5" strokeDasharray="4 6" />
-          <circle cx={CENTER + 88} cy={CENTER} r="7" fill="#E8762A" />
-          <circle cx={CENTER - 62} cy={CENTER + 62} r="5" fill="#D4A843" />
-          <circle cx={CENTER - 30} cy={CENTER - 83} r="4" fill="#B85C1A" />
-        </g>
+        <div className="absolute inset-[17%] rounded-full border border-gold/50" />
 
-        <circle cx={CENTER} cy={CENTER} r="52" fill="url(#hw-core)" />
-        <circle cx={CENTER} cy={CENTER} r="52" fill="none" stroke="#E8762A" strokeOpacity="0.6" strokeWidth="2" />
-      </svg>
+        {/* Inner orbit with planets */}
+        <div className="absolute inset-[27%] rounded-full border border-dashed border-orange/30 animate-spin-mid-reverse">
+          <span className="absolute w-3.5 h-3.5 rounded-full bg-orange" style={{ ...place(0, 50), transform: 'translate(-50%, -50%)' }} />
+          <span className="absolute w-2.5 h-2.5 rounded-full bg-gold" style={{ ...place(2.4, 50), transform: 'translate(-50%, -50%)' }} />
+          <span className="absolute w-2 h-2 rounded-full bg-orange-dark" style={{ ...place(4.4, 50), transform: 'translate(-50%, -50%)' }} />
+        </div>
 
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <Sparkles size={44} className="text-white drop-shadow" />
+        {/* Core */}
+        <div className="absolute inset-[37%] rounded-full bg-gradient-to-br from-orange-light to-orange shadow-lg shadow-orange/40 flex items-center justify-center">
+          <Sparkles size={40} className="text-white" />
+        </div>
       </div>
 
       <Link
         to="/horoscope"
-        className="card absolute -left-2 sm:-left-8 top-6 !p-3.5 flex items-center gap-3 animate-float shadow-lg"
+        className="card !absolute left-0 top-2 !p-3 flex items-center gap-3 animate-float shadow-lg"
       >
         <span className="w-9 h-9 rounded-xl bg-gold/15 text-gold flex items-center justify-center">
           <Sun size={18} />
@@ -79,7 +69,7 @@ export default function HeroWheel({ astrologer }) {
       {astrologer ? (
         <Link
           to={`/astrologer/profile/${astrologer.id}`}
-          className="card absolute -right-2 sm:-right-8 bottom-8 !p-3.5 flex items-center gap-3 animate-float-delayed shadow-lg"
+          className="card !absolute right-0 bottom-2 !p-3 flex items-center gap-3 animate-float-delayed shadow-lg"
         >
           <Avatar src={astrologer.photo} name={astrologer.name} size={40} online />
           <span className="text-left min-w-0">
@@ -93,7 +83,7 @@ export default function HeroWheel({ astrologer }) {
       ) : (
         <Link
           to="/astrologers"
-          className="card absolute -right-2 sm:-right-8 bottom-8 !p-3.5 flex items-center gap-3 animate-float-delayed shadow-lg"
+          className="card !absolute right-0 bottom-2 !p-3 flex items-center gap-3 animate-float-delayed shadow-lg"
         >
           <span className="w-9 h-9 rounded-xl bg-orange/15 text-orange flex items-center justify-center">
             <Sparkles size={18} />
