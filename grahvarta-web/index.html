@@ -17,10 +17,12 @@
       // Applied before first paint to avoid a flash of the wrong theme.
       (function () {
         try {
-          if (localStorage.getItem('grahvarta-theme') === 'light') {
+          if (localStorage.getItem('grahvarta-theme-v2') !== 'dark') {
             document.documentElement.setAttribute('data-theme', 'light');
           }
-        } catch (e) {}
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
       })();
     </script>
   </head>

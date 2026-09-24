@@ -5,14 +5,16 @@ import { createContext, useContext, useEffect, useState } from 'react'
 // :root[data-theme='light']) pick the right palette.
 
 const ThemeContext = createContext(null)
-const STORAGE_KEY = 'grahvarta-theme'
+// v2: default flipped to light; a new key resets the dark value the old
+// default had auto-saved for returning visitors.
+const STORAGE_KEY = 'grahvarta-theme-v2'
 
 function loadTheme() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
-    return stored === 'light' ? 'light' : 'dark'
+    return stored === 'dark' ? 'dark' : 'light'
   } catch {
-    return 'dark'
+    return 'light'
   }
 }
 

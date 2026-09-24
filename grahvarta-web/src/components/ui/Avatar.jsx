@@ -1,29 +1,29 @@
-// A real photo when the astrologer has one, otherwise an initials badge —
-// never a fake stock placeholder photo standing in for a real person.
+import { useEffect, useState } from 'react'
+import { User } from 'lucide-react'
+
+// A real photo when the astrologer has one; otherwise (or if the image fails
+// to load) a neutral person-silhouette placeholder — never a fake stock photo.
 export default function Avatar({ src, name, size = 64, rounded = 'rounded-xl', className = '', online }) {
-  const initials = (name || '?')
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
+  const [failed, setFailed] = useState(false)
+  useEffect(() => setFailed(false), [src])
 
   return (
     <div className={`relative shrink-0 ${className}`} style={{ width: size, height: size }}>
-      {src ? (
+      {src && !failed ? (
         <img
           src={src}
           alt={name}
           className={`w-full h-full object-cover border border-border ${rounded}`}
           loading="lazy"
+          onError={() => setFailed(true)}
         />
       ) : (
         <div
-          className={`w-full h-full flex items-center justify-center bg-gradient-to-br from-orange to-gold text-white font-bold ${rounded}`}
-          style={{ fontSize: size * 0.35 }}
+          className={`w-full h-full flex items-center justify-center bg-surface-light border border-border text-text-muted ${rounded}`}
+          role="img"
+          aria-label={name ? `${name} (no photo)` : 'No photo'}
         >
-          {initials}
+          <User size={Math.round(size * 0.5)} strokeWidth={1.5} />
         </div>
       )}
       {online !== undefined && (
