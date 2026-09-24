@@ -38,10 +38,33 @@ export default {
           '0%': { transform: 'translateX(0)' },
           '100%': { transform: 'translateX(-50%)' },
         },
+        spinSlow: {
+          from: { transform: 'rotate(0deg)' },
+          to: { transform: 'rotate(360deg)' },
+        },
+        spinSlowReverse: {
+          from: { transform: 'rotate(360deg)' },
+          to: { transform: 'rotate(0deg)' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
+        glow: {
+          '0%, 100%': { opacity: '0.55', transform: 'scale(1)' },
+          '50%': { opacity: '0.95', transform: 'scale(1.08)' },
+        },
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out forwards',
         marquee: 'marquee 40s linear infinite',
+        'spin-slow': 'spinSlow 90s linear infinite',
+        'spin-slow-reverse': 'spinSlowReverse 90s linear infinite',
+        'spin-mid': 'spinSlow 55s linear infinite',
+        'spin-mid-reverse': 'spinSlowReverse 55s linear infinite',
+        float: 'float 6s ease-in-out infinite',
+        'float-delayed': 'float 7s ease-in-out 1.5s infinite',
+        glow: 'glow 4s ease-in-out infinite',
       },
     },
   },
