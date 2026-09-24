@@ -2,17 +2,19 @@ import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import SectionHeading from './SectionHeading'
 import { setPageMeta } from '../../lib/demo'
+import { getLang, translateText, useI18nVersion } from '@i18n'
 
 // Shared layout for long-form legal pages: heading, sticky section index on
 // desktop, numbered sections, and a cross-link to the sibling policy.
 export default function LegalPage({ title, metaDescription, effectiveDate, sections, seeAlso }) {
+  useI18nVersion()
   useEffect(() => {
     setPageMeta(`${title} | GrahVarta`, metaDescription)
   }, [title, metaDescription])
 
   return (
     <div className="container-page py-8 sm:py-12">
-      <SectionHeading level="h1" eyebrow="Legal" title={title} subtitle={`Effective date: ${effectiveDate}`} />
+      <SectionHeading level="h1" eyebrow="Legal" title={translateText(title)} subtitle={`Effective date: ${effectiveDate}`} />
 
       <div className="grid lg:grid-cols-[14rem_1fr] gap-8">
         <nav aria-label={`${title} sections`} className="hidden lg:block">
@@ -31,6 +33,11 @@ export default function LegalPage({ title, metaDescription, effectiveDate, secti
         </nav>
 
         <article className="card card-static space-y-8">
+          {getLang() !== 'en' && (
+            <p className="text-xs text-text-muted bg-surface-light rounded-xl px-3 py-2.5">
+              The full text of this page is available in English.
+            </p>
+          )}
           {sections.map((s, i) => (
             <section key={s.id} id={s.id} className="scroll-mt-24">
               <h2 className="text-lg font-semibold mb-3">{i + 1}. {s.heading}</h2>

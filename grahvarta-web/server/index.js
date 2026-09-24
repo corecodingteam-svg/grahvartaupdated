@@ -30,6 +30,8 @@ app.use(express.json())
 const PORT = process.env.SERVER_PORT || 8787
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.6-flash'
+// Used for the last retry when the primary model is overloaded.
+const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash'
 
 if (!GEMINI_API_KEY) {
   console.warn('[api-server] GEMINI_API_KEY is not set in .env — /api routes will return errors.')
@@ -62,20 +64,27 @@ function hashString(str = '') {
 }
 
 async function callGemini(prompt, { temperature = 0.8 } = {}) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': GEMINI_API_KEY,
-    },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json', temperature, maxOutputTokens: 4096 },
-    }),
+  const body = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { responseMimeType: 'application/json', temperature, maxOutputTokens: 4096 },
   })
 
-  const data = await response.json()
+  // Gemini intermittently answers 429/500/503 ("high demand"); retry with
+  // backoff, using the fallback model on the last attempt.
+  const MAX_ATTEMPTS = 3
+  let response
+  let data
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    const model = attempt === MAX_ATTEMPTS && GEMINI_FALLBACK_MODEL !== GEMINI_MODEL ? GEMINI_FALLBACK_MODEL : GEMINI_MODEL
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_API_KEY },
+      body,
+    })
+    data = await response.json()
+    if (response.ok || ![429, 500, 503].includes(response.status) || attempt === MAX_ATTEMPTS) break
+    await new Promise((resolve) => setTimeout(resolve, 1500 * attempt))
+  }
 
   if (!response.ok) {
     throw new Error(data?.error?.message || `Gemini request failed with status ${response.status}`)

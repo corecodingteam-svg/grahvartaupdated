@@ -5,6 +5,7 @@ import { fetchAstrologerById } from '../lib/astrologers'
 import { normalizeAstrologer } from '../lib/astrologerDisplay'
 import { useConsultation } from '../hooks/useConsultation'
 import { useAgoraCall } from '../hooks/useAgoraCall'
+import { translateText, useI18nVersion } from '@i18n'
 import Avatar from '../components/ui/Avatar'
 import { setPageMeta } from '../lib/demo'
 
@@ -39,6 +40,7 @@ function VideoTile({ track, mirrored, className = '' }) {
 }
 
 export default function Call() {
+  useI18nVersion()
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const isVideo = searchParams.get('type') === 'video'
@@ -84,9 +86,9 @@ export default function Call() {
   const displayStatus =
     status === 'active'
       ? connected
-        ? `Connected · ${formatTime(elapsedSeconds)}`
-        : 'Connecting audio…'
-      : statusLabel[status] || status
+        ? translateText('Connected · {0}', [formatTime(elapsedSeconds)])
+        : translateText('Connecting audio…')
+      : translateText(statusLabel[status] || status)
 
   const inCallScreen = status === 'connecting' || status === 'queued' || status === 'active'
   const showVideoLayout = isVideo && inCallScreen

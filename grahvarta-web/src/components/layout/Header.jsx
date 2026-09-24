@@ -8,6 +8,7 @@ import { useCart } from '../../context/CartContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import { useOpenLogin } from '../../context/RequireAuthContext'
+import LanguageSwitcher from './LanguageSwitcher'
 
 const primaryLinks = [
   { label: 'Home', to: '/' },
@@ -182,7 +183,7 @@ export default function Header() {
           <span className="w-9 h-9 rounded-xl bg-orange flex items-center justify-center">
             <Sparkles size={18} className="text-white" />
           </span>
-          <span className="text-lg font-bold tracking-tight">
+          <span translate="no" className="text-lg font-bold tracking-tight">
             Grah<span className="text-orange">Varta</span>
           </span>
         </Link>
@@ -202,6 +203,7 @@ export default function Header() {
         </nav>
 
         <div className="hidden lg:flex items-center gap-3 shrink-0">
+          <LanguageSwitcher />
           <button
             type="button"
             onClick={toggleTheme}
@@ -213,7 +215,7 @@ export default function Header() {
           <Link
             to="/cart"
             className="relative p-2 rounded-xl hover:bg-surface-light text-text-secondary hover:text-text-primary transition-colors"
-            aria-label={`Cart${totalItems > 0 ? ` (${totalItems} items)` : ''}`}
+            aria-label={totalItems > 0 ? `Cart (${totalItems} items)` : 'Cart'}
           >
             <ShoppingCart size={20} />
             {totalItems > 0 && (
@@ -250,7 +252,7 @@ export default function Header() {
           <Link
             to="/cart"
             className="relative p-2 rounded-xl hover:bg-surface-light text-text-secondary"
-            aria-label={`Cart${totalItems > 0 ? ` (${totalItems} items)` : ''}`}
+            aria-label={totalItems > 0 ? `Cart (${totalItems} items)` : 'Cart'}
           >
             <ShoppingCart size={20} />
             {totalItems > 0 && (
@@ -321,6 +323,10 @@ export default function Header() {
                 {link.label}
               </NavLink>
             ))}
+
+            <div className="mt-3 border-t border-divider pt-2">
+              <LanguageSwitcher inline />
+            </div>
 
             <Link
               to="/astrologers"

@@ -7,6 +7,7 @@ import {
   Users, Bell, Star, Trash2, Pencil, X, Video, Radio, Eye, Heart, MessageSquare,
   BadgeCheck, Send,
 } from 'lucide-react'
+import { T, translateText } from '@i18n'
 import SectionHeading from '../components/ui/SectionHeading'
 import Card from '../components/ui/Card'
 import Avatar from '../components/ui/Avatar'
@@ -1188,7 +1189,7 @@ function ReviewForm({ consultation, onDone }) {
               onMouseEnter={() => setHoverRating(value)}
               onMouseLeave={() => setHoverRating(0)}
               onClick={() => setRating(value)}
-              aria-label={`Rate ${value} star${value > 1 ? 's' : ''}`}
+              aria-label={value === 1 ? 'Rate 1 star' : `Rate ${value} stars`}
             >
               <Star size={20} className={filled ? 'fill-gold text-gold' : 'fill-transparent text-text-muted'} />
             </button>
@@ -1236,7 +1237,7 @@ function ConsultationsTab() {
                 {c.type === 'chat' ? <MessageCircle size={16} /> : c.type === 'video' ? <Video size={16} /> : <PhoneCall size={16} />}
               </span>
               <div className="min-w-0">
-                <p className="text-sm font-medium capitalize truncate">{c.astrologer_name || `${c.type} consultation`}</p>
+                <p className="text-sm font-medium capitalize truncate">{c.astrologer_name || translateText({ chat: 'Chat consultation', voice: 'Voice consultation', video: 'Video consultation' }[c.type] || 'Consultation')}</p>
                 <p className="text-xs text-text-muted">{formatDate(c.created_at)} · {formatDuration(c.duration_seconds)}</p>
               </div>
             </div>
@@ -1323,7 +1324,7 @@ export default function Account() {
               <h2 className="flex items-center gap-2.5 text-2xl font-bold">
                 <activeTab.icon size={22} className="text-orange" /> {activeTab.label}
               </h2>
-              <p className="text-sm text-text-secondary mt-1">{activeTab.description}</p>
+              <p className="text-sm text-text-secondary mt-1"><T>{activeTab.description}</T></p>
             </div>
           )}
           {tab === 'profile' && <ProfileTab user={user} />}

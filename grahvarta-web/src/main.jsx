@@ -7,6 +7,9 @@ import { CartProvider } from './context/CartContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider } from './context/AuthContext'
 import { RequireAuthProvider } from './context/RequireAuthContext'
+import { installI18n } from '@i18n'
+
+installI18n()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

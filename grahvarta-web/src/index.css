@@ -236,3 +236,9 @@
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
 }
+
+/* Non-Latin scripts: use the Noto family loaded for the chosen language
+   (see src/i18n/store.js), falling back to Inter for digits and Latin. */
+html[lang]:not([lang='en']) body {
+  font-family: var(--lang-font, 'Inter'), 'Inter', system-ui, sans-serif;
+}

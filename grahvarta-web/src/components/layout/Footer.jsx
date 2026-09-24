@@ -43,7 +43,7 @@ export default function Footer() {
             <span className="w-9 h-9 rounded-xl bg-orange flex items-center justify-center">
               <Sparkles size={18} className="text-white" />
             </span>
-            <span className="text-lg font-bold">
+            <span translate="no" className="text-lg font-bold">
               Grah<span className="text-orange">Varta</span>
             </span>
           </Link>

@@ -1,9 +1,10 @@
 import toast from 'react-hot-toast'
+import { translateText } from '../i18n/store'
 
 // Central helper for stub actions (Chat/Call buttons etc.) so behaviour is
 // consistent across the whole demo site. No backend calls are ever made.
 export function demoOnly(message = "This is a demo — that action isn't wired up yet.") {
-  toast(message, { icon: '✨' })
+  toast(translateText(message), { icon: '✨' })
 }
 
 // Simple deterministic string hash (djb2-style) so demo astrology results

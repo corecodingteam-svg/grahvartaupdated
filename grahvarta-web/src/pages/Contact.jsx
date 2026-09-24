@@ -60,7 +60,7 @@ export default function Contact() {
       <div className="card card-static max-w-3xl">
         <h2 className="font-semibold mb-3 flex items-center gap-2"><HelpCircle size={18} className="text-gold" /> What can we help with?</h2>
         <ul className="list-disc pl-5 space-y-2 text-sm text-text-secondary">
-          {topics.map((t) => <li key={t}>{t}</li>)}
+          {topics.map((topic) => <li key={topic}>{topic}</li>)}
         </ul>
         <p className="text-xs text-text-muted mt-5">
           For billing or account questions, please write from the email address on your account so we can find it quickly.

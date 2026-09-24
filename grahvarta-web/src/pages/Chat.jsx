@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, Navigate } from 'react-router-dom'
 import { ArrowLeft, Send, PhoneOff, Wallet } from 'lucide-react'
+import { T } from '@i18n'
 import { fetchAstrologerById } from '../lib/astrologers'
 import { normalizeAstrologer } from '../lib/astrologerDisplay'
 import { useConsultation } from '../hooks/useConsultation'
@@ -104,7 +105,7 @@ export default function Chat() {
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold truncate">{astrologer?.name || 'Astrologer'}</p>
             <p className="text-xs text-text-muted">
-              {status === 'active' ? `Live · ${formatTime(elapsedSeconds)}` : statusCopy[status] || status}
+              {status === 'active' ? `Live · ${formatTime(elapsedSeconds)}` : <T>{statusCopy[status] || status}</T>}
             </p>
           </div>
           {status === 'active' && (
@@ -123,7 +124,7 @@ export default function Chat() {
         {status === 'connecting' || status === 'queued' ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6">
             <span className="w-12 h-12 rounded-full border-4 border-surface-light border-t-orange animate-spin" />
-            <p className="text-sm text-text-secondary">{statusCopy[status]}</p>
+            <p className="text-sm text-text-secondary"><T>{statusCopy[status]}</T></p>
           </div>
         ) : status === 'rejected' ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">

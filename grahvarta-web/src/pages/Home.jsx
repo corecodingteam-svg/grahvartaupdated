@@ -7,6 +7,7 @@ import {
   ShieldCheck, Signal, Wifi, BatteryFull, ChevronLeft, Send,
 } from 'lucide-react'
 import { AstrologerCardSkeleton } from '../components/ui/Skeleton'
+import { T } from '@i18n'
 import Reveal from '../components/ui/Reveal'
 import SectionHeading from '../components/ui/SectionHeading'
 import AstrologerCard from '../components/astrologer/AstrologerCard'
@@ -247,7 +248,7 @@ export default function Home() {
                   <Icon size={22} />
                 </span>
                 <h3 className="font-semibold text-lg mb-1">{service.label}</h3>
-                <p className="text-sm text-text-secondary max-w-[16rem] mb-4">{featuredCopy[service.id]}</p>
+                <p className="text-sm text-text-secondary max-w-[16rem] mb-4"><T>{featuredCopy[service.id]}</T></p>
                 <span className="inline-flex items-center gap-1 text-sm font-medium text-orange">
                   Explore <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                 </span>
@@ -365,7 +366,7 @@ export default function Home() {
 
             <div className="relative hidden lg:flex justify-center">
               <div className="w-72 h-72 rounded-full bg-orange/20 blur-3xl absolute" aria-hidden="true" />
-              <div className="relative w-72 h-[480px] rounded-[2.5rem] border-8 border-card bg-white shadow-2xl overflow-hidden text-slate-900">
+              <div translate="no" className="relative w-72 h-[480px] rounded-[2.5rem] border-8 border-card bg-white shadow-2xl overflow-hidden text-slate-900">
                 <div className="absolute top-0 inset-x-0 h-7 flex justify-center z-10">
                   <div className="w-28 h-5 bg-card rounded-b-2xl" />
                 </div>

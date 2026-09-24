@@ -1,3 +1,4 @@
+import { translateText } from '@i18n'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, Navigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
@@ -68,8 +69,14 @@ export default function AstrologerCategory() {
       <SectionHeading
         level="h1"
         eyebrow="Category"
-        title={`${meta.label} Astrologers`}
-        subtitle={loading ? 'Loading…' : `${list.length} expert${list.length === 1 ? '' : 's'} available for ${meta.label.toLowerCase()} consultations.`}
+        title={`${translateText(meta.label)} Astrologers`}
+        subtitle={
+          loading
+            ? 'Loading…'
+            : list.length === 1
+              ? `1 expert available for ${translateText(meta.label).toLowerCase()} consultations.`
+              : `${list.length} experts available for ${translateText(meta.label).toLowerCase()} consultations.`
+        }
       />
 
       {loading ? (
