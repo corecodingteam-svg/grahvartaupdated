@@ -144,7 +144,7 @@ export default function LiveView() {
 
       {tipOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-4" onClick={() => setTipOpen(false)}>
-          <div className="card w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+          <div className="card card-static w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-semibold mb-4 flex items-center gap-2"><Gift size={18} className="text-gold" /> Send a Gift</h3>
             <div className="flex flex-wrap gap-2 mb-4">
               {tipPresets.map((amt) => (

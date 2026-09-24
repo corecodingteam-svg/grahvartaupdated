@@ -26,7 +26,7 @@ export default function Modal({ open, onClose, title, children }) {
       onClick={onClose}
     >
       <div
-        className="card w-full max-w-sm max-h-[90vh] overflow-y-auto animate-fade-in"
+        className="card card-static w-full max-w-sm max-h-[90vh] overflow-y-auto animate-fade-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
