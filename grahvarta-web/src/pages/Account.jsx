@@ -31,16 +31,16 @@ import { ApiError } from '../lib/api'
 import { setPageMeta } from '../lib/demo'
 
 const tabs = [
-  { id: 'profile', label: 'Profile', icon: UserRound },
-  { id: 'wallet', label: 'Wallet', icon: WalletIcon },
-  { id: 'horoscope', label: 'My Horoscope', icon: Sun },
-  { id: 'birthchart', label: 'Birth Chart', icon: Sparkles },
-  { id: 'reports', label: 'Reports', icon: Lock },
-  { id: 'live', label: 'Live & Community', icon: Radio },
-  { id: 'family', label: 'Family Members', icon: Users },
-  { id: 'notifications', label: 'Notifications', icon: Bell },
-  { id: 'chats', label: 'Chat History', icon: MessageCircle },
-  { id: 'consultations', label: 'Consultations', icon: History },
+  { id: 'profile', label: 'Profile', icon: UserRound, description: 'Your personal details and birth information.' },
+  { id: 'wallet', label: 'Wallet', icon: WalletIcon, description: 'Check your balance, add money and view transactions.' },
+  { id: 'horoscope', label: 'My Horoscope', icon: Sun, description: 'Your personalised horoscope, based on your birth details.' },
+  { id: 'birthchart', label: 'Birth Chart', icon: Sparkles, description: 'Planet positions, houses and aspects from your birth details.' },
+  { id: 'reports', label: 'Reports', icon: Lock, description: 'Detailed astrology reports, unlocked with credits.' },
+  { id: 'live', label: 'Live & Community', icon: Radio, description: 'Join live sessions and connect with the community.' },
+  { id: 'family', label: 'Family Members', icon: Users, description: 'Save family details to use across horoscopes and reports.' },
+  { id: 'notifications', label: 'Notifications', icon: Bell, description: 'Your latest updates and alerts.' },
+  { id: 'chats', label: 'Chat History', icon: MessageCircle, description: 'Your past conversations with astrologers.' },
+  { id: 'consultations', label: 'Consultations', icon: History, description: 'Your past chats and calls, and reviews you can leave.' },
 ]
 
 function formatDate(dateStr) {
@@ -1281,6 +1281,8 @@ export default function Account() {
     return <Navigate to="/" replace />
   }
 
+  const activeTab = tabs.find((t) => t.id === tab)
+
   function handleLogout() {
     logout()
     navigate('/')
@@ -1316,6 +1318,14 @@ export default function Account() {
         </aside>
 
         <div className="flex-1 min-w-0">
+          {activeTab && (
+            <div className="mb-5">
+              <h2 className="flex items-center gap-2.5 text-2xl font-bold">
+                <activeTab.icon size={22} className="text-orange" /> {activeTab.label}
+              </h2>
+              <p className="text-sm text-text-secondary mt-1">{activeTab.description}</p>
+            </div>
+          )}
           {tab === 'profile' && <ProfileTab user={user} />}
           {tab === 'wallet' && <WalletTab />}
           {tab === 'horoscope' && <MyHoroscopeTab />}
