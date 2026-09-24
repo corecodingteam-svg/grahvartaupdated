@@ -21,20 +21,20 @@
   /* Day theme — white base with a soft light-yellow gradient (astrotalk.com-style), warm neutrals for surfaces and text. */
   :root[data-theme='light'] {
     --color-background: 255 255 255;
-    --color-surface: 255 253 244;
-    --color-surface-light: 255 248 225;
+    --color-surface: 255 254 249;
+    --color-surface-light: 255 251 237;
     --color-card: 255 255 252;
     --color-text-primary: 33 24 16;
     --color-text-secondary: 92 68 48;
     --color-text-muted: 120 108 98;
-    --color-border: 244 236 208;
-    --color-divider: 249 243 222;
+    --color-border: 246 240 218;
+    --color-divider: 250 246 230;
     --color-error: 229 57 53;
     --color-success: 43 160 90;
   }
 
   :root[data-theme='light'] body {
-    background-image: linear-gradient(170deg, #ffffff 0%, #fffefa 35%, #fffcee 70%, #fff8d9 100%);
+    background-image: linear-gradient(170deg, #ffffff 0%, #fffffc 40%, #fffef6 75%, #fffcea 100%);
     background-attachment: fixed;
   }
 
@@ -97,7 +97,7 @@
   }
 
   :root[data-theme='light'] .card {
-    background-image: linear-gradient(160deg, #ffffff 0%, #fffefa 60%, #fffbea 100%);
+    background-image: linear-gradient(160deg, #ffffff 0%, #fffffd 65%, #fffef6 100%);
   }
 
   :root[data-theme='light'] .card::before {
