@@ -18,24 +18,23 @@
     --color-success: 67 160 71;
   }
 
-  /* Day theme — white base with a warm cream-to-orange wash (orange twist on
-     the astrotalk.com white/yellow look), warm neutrals for surfaces and text. */
+  /* Day theme — white base with a soft light-yellow gradient (astrotalk.com-style), warm neutrals for surfaces and text. */
   :root[data-theme='light'] {
     --color-background: 255 255 255;
-    --color-surface: 255 247 237;
-    --color-surface-light: 255 237 213;
-    --color-card: 255 252 247;
+    --color-surface: 255 250 232;
+    --color-surface-light: 255 243 204;
+    --color-card: 255 254 247;
     --color-text-primary: 33 24 16;
     --color-text-secondary: 92 68 48;
     --color-text-muted: 120 108 98;
-    --color-border: 245 219 188;
-    --color-divider: 250 232 210;
+    --color-border: 240 226 176;
+    --color-divider: 247 237 200;
     --color-error: 229 57 53;
     --color-success: 43 160 90;
   }
 
   :root[data-theme='light'] body {
-    background-image: linear-gradient(168deg, #fff 0%, #fffaf3 30%, #ffefdb 60%, #ffcf9e 100%);
+    background-image: linear-gradient(168deg, #fff 0%, #fffdf0 30%, #fff8d2 60%, #ffec99 100%);
     background-attachment: fixed;
   }
 
@@ -95,6 +94,10 @@
     opacity: 0;
     transition: opacity 0.35s ease;
     background: radial-gradient(circle at 100% 0%, rgba(232, 118, 42, 0.22), transparent 60%);
+  }
+
+  :root[data-theme='light'] .card {
+    background-image: linear-gradient(160deg, #ffffff 0%, #fffbe6 55%, #fff1b8 100%);
   }
 
   :root[data-theme='light'] .card::before {

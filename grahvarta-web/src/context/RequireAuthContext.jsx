@@ -1,4 +1,5 @@
 import { createContext, useContext, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import LoginModal from '../components/auth/LoginModal'
 
@@ -12,6 +13,7 @@ const RequireAuthContext = createContext(null)
 
 export function RequireAuthProvider({ children }) {
   const { isAuthenticated } = useAuth()
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState('')
   const pendingActionRef = useRef(null)
@@ -35,7 +37,10 @@ export function RequireAuthProvider({ children }) {
     setOpen(false)
     const action = pendingActionRef.current
     pendingActionRef.current = null
-    action?.()
+    // A gated action (Chat/Call) continues where the user was; a plain login
+    // lands on the astrologer list.
+    if (action) action()
+    else navigate('/astrologers')
   }
 
   function openLogin(promptMessage = '') {
