@@ -38,7 +38,7 @@ export default function HoroscopeDetail() {
     setError(false)
     setAiResult(null)
 
-    fetch('/api/horoscope', {
+    fetch('/web-api/horoscope', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

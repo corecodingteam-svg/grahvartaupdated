@@ -48,7 +48,7 @@ export default function KundliMatchingResult() {
       setLoadingStep((s) => (s + 1) % loadingMessages.length)
     }, 1400)
 
-    fetch('/api/kundli-match', {
+    fetch('/web-api/kundli-match', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ person1, person2 }),

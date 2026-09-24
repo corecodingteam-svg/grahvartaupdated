@@ -51,7 +51,7 @@ export default function KundliResult() {
       setLoadingStep((s) => (s + 1) % loadingMessages.length)
     }, 1400)
 
-    fetch('/api/kundli', {
+    fetch('/web-api/kundli', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData),

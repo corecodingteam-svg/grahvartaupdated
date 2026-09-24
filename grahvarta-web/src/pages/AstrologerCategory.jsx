@@ -1,22 +1,60 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, Navigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import AstrologerCard from '../components/astrologer/AstrologerCard'
+import Card from '../components/ui/Card'
 import SectionHeading from '../components/ui/SectionHeading'
-import { getAstrologersByCategory } from '../data/astrologers'
+import { fetchAstrologers } from '../lib/astrologers'
+import { normalizeAstrologer } from '../lib/astrologerDisplay'
 import { astrologerCategories } from '../data/categories'
 import { setPageMeta } from '../lib/demo'
 
 export default function AstrologerCategory() {
   const { category } = useParams()
   const meta = astrologerCategories.find((c) => c.id === category)
-  const list = getAstrologersByCategory(category)
+
+  const [astrologers, setAstrologers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
     if (meta) {
       setPageMeta(`${meta.label} Astrologers | GrahVarta`, `Consult expert ${meta.label} astrologers on GrahVarta.`)
     }
   }, [meta])
+
+  useEffect(() => {
+    if (!meta) return
+    let cancelled = false
+    setLoading(true)
+    setError(false)
+    fetchAstrologers({ limit: 100 })
+      .then(({ list }) => {
+        if (!cancelled) setAstrologers(list.map(normalizeAstrologer))
+      })
+      .catch(() => {
+        if (!cancelled) setError(true)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [meta])
+
+  // The real specialization strings astrologers register with aren't a known
+  // fixed taxonomy, so this matches loosely (substring, case-insensitive)
+  // against expertise/bio rather than requiring an exact field match.
+  const list = useMemo(() => {
+    if (!meta) return []
+    const keyword = meta.label.toLowerCase().split(/\s+&\s+|\s+/)[0]
+    return astrologers.filter(
+      (a) =>
+        a.expertise.some((tag) => tag.toLowerCase().includes(keyword)) ||
+        a.bio.toLowerCase().includes(keyword)
+    )
+  }, [astrologers, meta])
 
   if (!meta) {
     return <Navigate to="/astrologers" replace />
@@ -31,10 +69,20 @@ export default function AstrologerCategory() {
         level="h1"
         eyebrow="Category"
         title={`${meta.label} Astrologers`}
-        subtitle={`${list.length} expert${list.length === 1 ? '' : 's'} available for ${meta.label.toLowerCase()} consultations.`}
+        subtitle={loading ? 'Loading…' : `${list.length} expert${list.length === 1 ? '' : 's'} available for ${meta.label.toLowerCase()} consultations.`}
       />
 
-      {list.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i} className="h-48 animate-pulse" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="card text-center py-16">
+          <p className="text-text-secondary">Could not load astrologers right now. Please try again shortly.</p>
+        </div>
+      ) : list.length === 0 ? (
         <div className="card text-center py-16">
           <p className="text-text-secondary">No astrologers available in this category right now.</p>
           <Link to="/astrologers" className="btn-outline mt-4 inline-flex">

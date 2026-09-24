@@ -19,7 +19,7 @@ export default function PlanetTransit() {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/planet-transit')
+    fetch('/web-api/planet-transit')
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('request failed'))))
       .then((data) => {
         if (!cancelled) setTransits(data.transits)

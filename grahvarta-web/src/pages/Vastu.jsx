@@ -41,7 +41,7 @@ export default function Vastu() {
     setResult(null)
 
     try {
-      const res = await fetch('/api/vastu', {
+      const res = await fetch('/web-api/vastu', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ spaceType: activeId, facingDirection, concern: concern.trim() }),

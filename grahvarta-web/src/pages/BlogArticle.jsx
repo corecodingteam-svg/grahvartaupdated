@@ -22,7 +22,7 @@ export default function BlogArticle() {
     // slug outside the hand-written set (an auto-published one) needs the fetch.
     if (staticArticle) return
     let cancelled = false
-    fetch('/api/blog')
+    fetch('/web-api/blog')
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('request failed'))))
       .then((data) => {
         if (!cancelled) setAllArticles(data.articles)

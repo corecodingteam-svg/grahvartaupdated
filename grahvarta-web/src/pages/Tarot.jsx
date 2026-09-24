@@ -101,7 +101,7 @@ export default function Tarot() {
     setLoadingReading(true)
     setReadingError(false)
 
-    fetch('/api/tarot', {
+    fetch('/web-api/tarot', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ readingType: readingType.id, question: question.trim(), cards: revealedCards }),

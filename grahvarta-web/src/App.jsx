@@ -33,6 +33,8 @@ const Cart = lazy(() => import('./pages/Cart'))
 const Blog = lazy(() => import('./pages/Blog'))
 const BlogArticle = lazy(() => import('./pages/BlogArticle'))
 const StoryPrivacyPolicy = lazy(() => import('./pages/StoryPrivacyPolicy'))
+const Account = lazy(() => import('./pages/Account'))
+const LiveView = lazy(() => import('./pages/LiveView'))
 
 // Future-phase features get a nav link now, but route to ComingSoon so the
 // site never 404s while pages roll out incrementally.
@@ -109,6 +111,8 @@ export default function App() {
             <Route path="/shop" element={<Shop />} />
             <Route path="/shop/:slug" element={<ProductDetail />} />
             <Route path="/cart" element={<Cart />} />
+            <Route path="/account" element={<Account />} />
+            <Route path="/live/:sessionId" element={<LiveView />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogArticle />} />
             {comingSoonRoutes.map((r) => (

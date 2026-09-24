@@ -133,7 +133,15 @@ The deploy script:
 
 ```bash
 cd /opt/grahvarta
-git pull origin main
+bash deploy/redeploy.sh
+```
+
+Equivalent to, and safe to run manually instead:
+
+```bash
+cd /opt/grahvarta
+git fetch origin
+git reset --hard origin/main
 docker compose up -d --build
 docker compose restart nginx
 ```
@@ -141,17 +149,11 @@ docker compose restart nginx
 ### Rebuild only specific services
 
 ```bash
-# Backend only
-docker compose up -d --build backend
-docker compose restart nginx
-
-# Astrologer portal only
-docker compose up -d --build astrologer
-docker compose restart nginx
-
-# Admin portal only
-docker compose up -d --build admin
-docker compose restart nginx
+bash deploy/redeploy.sh backend        # Backend API only
+bash deploy/redeploy.sh web            # GrahVarta consumer site only
+bash deploy/redeploy.sh web-api        # Gemini-backed API proxy only (kundli, panchang, tarot, …)
+bash deploy/redeploy.sh astrologer     # Astrologer portal only
+bash deploy/redeploy.sh admin          # Admin portal only
 ```
 
 ---
@@ -200,6 +202,14 @@ FIREBASE_SERVICE_ACCOUNT_ASTROLOGER={"type":"service_account","project_id":"grah
 
 UPLOAD_DIR=./uploads
 MAX_FILE_SIZE=10485760
+```
+
+### `/opt/grahvarta/grahvarta-web/.env` (web-api secrets — Gemini-backed features)
+
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-3.6-flash
+SERVER_PORT=8787
 ```
 
 ---

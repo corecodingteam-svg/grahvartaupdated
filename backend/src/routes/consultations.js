@@ -32,6 +32,40 @@ router.post('/upload-image', authenticate, (req, res, next) => {
   res.json({ success: true, data: { url: `${baseUrl}/uploads/chat/${req.file.filename}` } });
 });
 
+// Added for the website's user portal — no user-facing "list my
+// consultations" endpoint existed before (only the astrologer-side
+// equivalent in astrologerController.getConsultationHistory). Read-only,
+// reuses the existing consultations table, scoped to the caller's own id.
+router.get('/history', authenticate, async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const [result, countResult] = await Promise.all([
+      db.query(
+        `SELECT c.*, a.display_name AS astrologer_name, a.avatar_url AS astrologer_avatar_url
+         FROM consultations c
+         JOIN astrologers a ON a.id = c.astrologer_id
+         WHERE c.user_id = $1
+         ORDER BY c.created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [req.user.id, limit, offset]
+      ),
+      db.query(`SELECT COUNT(*) FROM consultations WHERE user_id = $1`, [req.user.id]),
+    ]);
+
+    res.json({
+      success: true,
+      data: result.rows,
+      total: parseInt(countResult.rows[0].count, 10),
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 router.patch('/:id/end', authenticate, async (req, res) => {
   try {
     await db.query(

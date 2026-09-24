@@ -20,7 +20,7 @@ export default function Muhurat() {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/muhurat')
+    fetch('/web-api/muhurat')
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('request failed'))))
       .then((data) => {
         if (!cancelled) setCategories(data.categories)

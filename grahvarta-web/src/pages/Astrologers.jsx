@@ -1,89 +1,121 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Search, SlidersHorizontal } from 'lucide-react'
 import AstrologerCard from '../components/astrologer/AstrologerCard'
+import Card from '../components/ui/Card'
 import SectionHeading from '../components/ui/SectionHeading'
-import { astrologers } from '../data/astrologers'
-import { astrologerCategories } from '../data/categories'
+import { fetchAstrologers, sortOptions } from '../lib/astrologers'
+import { normalizeAstrologer } from '../lib/astrologerDisplay'
 import { setPageMeta } from '../lib/demo'
 
-const allLanguages = [...new Set(astrologers.flatMap((a) => a.languages))].sort()
-const allExpertise = [...new Set(astrologers.flatMap((a) => a.expertise))].sort()
-
-const sortOptions = [
-  { id: 'popularity', label: 'Popularity' },
-  { id: 'price-low', label: 'Price: Low to High' },
-  { id: 'price-high', label: 'Price: High to Low' },
-  { id: 'rating', label: 'Rating' },
-  { id: 'experience', label: 'Experience' },
-]
+const PAGE_SIZE = 24
 
 export default function Astrologers() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [query, setQuery] = useState('')
-  const [category, setCategory] = useState(searchParams.get('category') || '')
+  const [query, setQuery] = useState(searchParams.get('q') || '')
   const [expertise, setExpertise] = useState('')
   const [language, setLanguage] = useState('')
-  const [maxPrice, setMaxPrice] = useState(50)
+  const [maxPrice, setMaxPrice] = useState(0)
   const [minExperience, setMinExperience] = useState(0)
   const [minRating, setMinRating] = useState(0)
   const [onlineOnly, setOnlineOnly] = useState(false)
-  const [sortBy, setSortBy] = useState('popularity')
+  const [sortBy, setSortBy] = useState('popular')
   const [filtersOpen, setFiltersOpen] = useState(false)
 
+  const [astrologers, setAstrologers] = useState([])
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState(false)
+
   useEffect(() => {
-    setPageMeta('Astrologers | GrahVarta', 'Browse and filter verified astrologers by category, language, price, experience and rating.')
+    setPageMeta('Astrologers | GrahVarta', 'Browse and filter verified astrologers by expertise, language, price, experience and rating.')
   }, [])
+
+  const loadPage = useCallback(async (pageToLoad, { append } = {}) => {
+    if (append) setLoadingMore(true)
+    else setLoading(true)
+    setError(false)
+
+    try {
+      const { list, total: totalCount } = await fetchAstrologers({
+        page: pageToLoad,
+        limit: PAGE_SIZE,
+        sort: sortBy,
+        onlineOnly,
+      })
+      const normalized = list.map(normalizeAstrologer)
+      setAstrologers((prev) => (append ? [...prev, ...normalized] : normalized))
+      setTotal(totalCount)
+      setPage(pageToLoad)
+    } catch {
+      setError(true)
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortBy, onlineOnly])
+
+  useEffect(() => {
+    loadPage(1)
+  }, [loadPage])
 
   useEffect(() => {
     const next = {}
-    if (category) next.category = category
+    if (query) next.q = query
     setSearchParams(next, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category])
+  }, [query])
+
+  // Filter option lists are derived from whatever's actually been loaded so
+  // far, rather than a hardcoded taxonomy — the real specialization/language
+  // strings astrologers register with aren't known ahead of time.
+  const allLanguages = useMemo(
+    () => [...new Set(astrologers.flatMap((a) => a.languages))].sort(),
+    [astrologers]
+  )
+  const allExpertise = useMemo(
+    () => [...new Set(astrologers.flatMap((a) => a.expertise))].sort(),
+    [astrologers]
+  )
+  const highestPrice = useMemo(
+    () => astrologers.reduce((max, a) => Math.max(max, a.pricePerMin), 0),
+    [astrologers]
+  )
 
   const filtered = useMemo(() => {
-    let list = astrologers.filter((a) => {
-      if (query && !a.name.toLowerCase().includes(query.toLowerCase())) return false
-      if (category && a.category !== category) return false
+    // Matches loosely against name, expertise and bio — the query can come
+    // from a free-text "Browse by Category" tile (e.g. "Love & Relationship"),
+    // not just a literal name search, and the real specialization taxonomy
+    // isn't known ahead of time.
+    const queryWords = query.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2)
+
+    return astrologers.filter((a) => {
+      if (queryWords.length > 0) {
+        const haystack = `${a.name} ${a.expertise.join(' ')} ${a.bio}`.toLowerCase()
+        if (!queryWords.some((w) => haystack.includes(w))) return false
+      }
       if (expertise && !a.expertise.includes(expertise)) return false
       if (language && !a.languages.includes(language)) return false
-      if (a.pricePerMin > maxPrice) return false
+      if (maxPrice > 0 && a.pricePerMin > maxPrice) return false
       if (a.experienceYears < minExperience) return false
       if (a.rating < minRating) return false
-      if (onlineOnly && !a.online) return false
       return true
     })
-
-    list = [...list].sort((a, b) => {
-      switch (sortBy) {
-        case 'price-low':
-          return a.pricePerMin - b.pricePerMin
-        case 'price-high':
-          return b.pricePerMin - a.pricePerMin
-        case 'rating':
-          return b.rating - a.rating
-        case 'experience':
-          return b.experienceYears - a.experienceYears
-        default:
-          return b.reviewCount - a.reviewCount
-      }
-    })
-
-    return list
-  }, [query, category, expertise, language, maxPrice, minExperience, minRating, onlineOnly, sortBy])
+  }, [astrologers, query, expertise, language, maxPrice, minExperience, minRating])
 
   function resetFilters() {
     setQuery('')
-    setCategory('')
     setExpertise('')
     setLanguage('')
-    setMaxPrice(50)
+    setMaxPrice(0)
     setMinExperience(0)
     setMinRating(0)
-    setOnlineOnly(false)
-    setSortBy('popularity')
   }
+
+  const hasMore = astrologers.length < total
 
   return (
     <div className="container-page py-8 sm:py-12">
@@ -91,7 +123,7 @@ export default function Astrologers() {
         level="h1"
         eyebrow="Discover"
         title="Find Your Astrologer"
-        subtitle="Filter by category, expertise, language, price, experience and rating to find the right match."
+        subtitle="Filter by expertise, language, price, experience and rating to find the right match."
       />
 
       <div className="flex flex-col lg:flex-row gap-6">
@@ -116,63 +148,57 @@ export default function Astrologers() {
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="e.g. Acharya Ramesh"
+                  placeholder="Search astrologers"
                   className="input-field pl-9"
                 />
               </div>
             </div>
 
-            <div>
-              <label htmlFor="category" className="text-xs text-text-secondary font-medium mb-1.5 block">
-                Category
-              </label>
-              <select id="category" value={category} onChange={(e) => setCategory(e.target.value)} className="input-field">
-                <option value="">All categories</option>
-                {astrologerCategories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.label}</option>
-                ))}
-              </select>
-            </div>
+            {allExpertise.length > 0 && (
+              <div>
+                <label htmlFor="expertise" className="text-xs text-text-secondary font-medium mb-1.5 block">
+                  Expertise
+                </label>
+                <select id="expertise" value={expertise} onChange={(e) => setExpertise(e.target.value)} className="input-field">
+                  <option value="">All expertise</option>
+                  {allExpertise.map((e) => (
+                    <option key={e} value={e}>{e}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-            <div>
-              <label htmlFor="expertise" className="text-xs text-text-secondary font-medium mb-1.5 block">
-                Expertise
-              </label>
-              <select id="expertise" value={expertise} onChange={(e) => setExpertise(e.target.value)} className="input-field">
-                <option value="">All expertise</option>
-                {allExpertise.map((e) => (
-                  <option key={e} value={e}>{e}</option>
-                ))}
-              </select>
-            </div>
+            {allLanguages.length > 0 && (
+              <div>
+                <label htmlFor="language" className="text-xs text-text-secondary font-medium mb-1.5 block">
+                  Language
+                </label>
+                <select id="language" value={language} onChange={(e) => setLanguage(e.target.value)} className="input-field">
+                  <option value="">All languages</option>
+                  {allLanguages.map((l) => (
+                    <option key={l} value={l}>{l}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-            <div>
-              <label htmlFor="language" className="text-xs text-text-secondary font-medium mb-1.5 block">
-                Language
-              </label>
-              <select id="language" value={language} onChange={(e) => setLanguage(e.target.value)} className="input-field">
-                <option value="">All languages</option>
-                {allLanguages.map((l) => (
-                  <option key={l} value={l}>{l}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="price" className="text-xs text-text-secondary font-medium mb-1.5 block">
-                Max price: ₹{maxPrice}/min
-              </label>
-              <input
-                id="price"
-                type="range"
-                min={10}
-                max={50}
-                step={5}
-                value={maxPrice}
-                onChange={(e) => setMaxPrice(Number(e.target.value))}
-                className="w-full accent-orange"
-              />
-            </div>
+            {highestPrice > 0 && (
+              <div>
+                <label htmlFor="price" className="text-xs text-text-secondary font-medium mb-1.5 block">
+                  Max price: {maxPrice > 0 ? `₹${maxPrice}/min` : 'Any'}
+                </label>
+                <input
+                  id="price"
+                  type="range"
+                  min={0}
+                  max={highestPrice}
+                  step={5}
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(Number(e.target.value))}
+                  className="w-full accent-orange"
+                />
+              </div>
+            )}
 
             <div>
               <label htmlFor="experience" className="text-xs text-text-secondary font-medium mb-1.5 block">
@@ -228,7 +254,9 @@ export default function Astrologers() {
             >
               <SlidersHorizontal size={16} /> Filters
             </button>
-            <p className="text-sm text-text-secondary">{filtered.length} astrologers found</p>
+            <p className="text-sm text-text-secondary">
+              {loading ? 'Loading…' : `${filtered.length} of ${total} astrologers`}
+            </p>
             <select
               aria-label="Sort by"
               value={sortBy}
@@ -241,7 +269,20 @@ export default function Astrologers() {
             </select>
           </div>
 
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Card key={i} className="h-48 animate-pulse" />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="card text-center py-16">
+              <p className="text-text-secondary">Could not load astrologers right now. Please try again shortly.</p>
+              <button type="button" onClick={() => loadPage(1)} className="btn-outline mt-4">
+                Retry
+              </button>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="card text-center py-16">
               <p className="text-text-secondary">No astrologers match your filters.</p>
               <button type="button" onClick={resetFilters} className="btn-outline mt-4">
@@ -249,11 +290,25 @@ export default function Astrologers() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filtered.map((a) => (
-                <AstrologerCard key={a.id} astrologer={a} />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {filtered.map((a) => (
+                  <AstrologerCard key={a.id} astrologer={a} />
+                ))}
+              </div>
+              {hasMore && (
+                <div className="flex justify-center mt-6">
+                  <button
+                    type="button"
+                    onClick={() => loadPage(page + 1, { append: true })}
+                    className="btn-outline"
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? 'Loading…' : 'Load more astrologers'}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

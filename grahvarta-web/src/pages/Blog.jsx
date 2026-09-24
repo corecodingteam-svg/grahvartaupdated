@@ -25,7 +25,7 @@ export default function Blog() {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/blog')
+    fetch('/web-api/blog')
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('request failed'))))
       .then((data) => {
         if (!cancelled) setArticles(data.articles)

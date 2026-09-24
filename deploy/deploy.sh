@@ -72,6 +72,7 @@ if [ ! -f "$APP_DIR/.env" ]; then
 DOMAIN=$DOMAIN
 API_DOMAIN=$API_DOMAIN
 VITE_API_URL=https://$API_DOMAIN
+VITE_SOCKET_URL=https://$API_DOMAIN
 DB_NAME=grahvarta_db
 DB_USER=grahvarta_user
 DB_PASSWORD=$DB_PASSWORD
@@ -128,6 +129,22 @@ ENV
   [[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborting. Re-run after editing the .env file."; exit 1; }
 else
   echo "  ✓ backend/.env already exists — skipping"
+fi
+
+# grahvarta-web/.env (for the web-api container — Gemini-backed features)
+if [ ! -f "$APP_DIR/grahvarta-web/.env" ]; then
+  cat > "$APP_DIR/grahvarta-web/.env" << ENV
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-3.6-flash
+SERVER_PORT=8787
+ENV
+  echo "  ⚠  Created grahvarta-web/.env — fill in GEMINI_API_KEY before continuing!"
+  echo "      Edit $APP_DIR/grahvarta-web/.env, then re-run this script."
+  echo ""
+  read -r -p "Have you filled in GEMINI_API_KEY? [y/N]: " confirm
+  [[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborting. Re-run after editing the .env file."; exit 1; }
+else
+  echo "  ✓ grahvarta-web/.env already exists — skipping"
 fi
 
 # ── 5. SSL Certificates ───────────────────────────────────────────────────

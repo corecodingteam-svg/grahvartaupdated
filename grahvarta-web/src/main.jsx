@@ -5,14 +5,20 @@ import './index.css'
 import App from './App'
 import { CartProvider } from './context/CartContext'
 import { ThemeProvider } from './context/ThemeContext'
+import { AuthProvider } from './context/AuthContext'
+import { RequireAuthProvider } from './context/RequireAuthContext'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <ThemeProvider>
-        <CartProvider>
-          <App />
-        </CartProvider>
+        <AuthProvider>
+          <RequireAuthProvider>
+            <CartProvider>
+              <App />
+            </CartProvider>
+          </RequireAuthProvider>
+        </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
   </StrictMode>

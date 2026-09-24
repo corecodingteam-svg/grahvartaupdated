@@ -38,7 +38,18 @@ services:
     build:
       context: ./grahvarta-web
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://api.grahvarta.com}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-https://api.grahvarta.com}
     restart: unless-stopped
+
+  # ── GrahVarta Web API (Gemini-backed proxy: kundli, panchang, tarot, …) ───
+  web-api:
+    build:
+      context: ./grahvarta-web
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    env_file: ./grahvarta-web/.env
 
   # ── Astrologer Portal ─────────────────────────────────────────────────────
   astrologer:
@@ -72,6 +83,7 @@ services:
     depends_on:
       - backend
       - web
+      - web-api
       - astrologer
       - admin
 

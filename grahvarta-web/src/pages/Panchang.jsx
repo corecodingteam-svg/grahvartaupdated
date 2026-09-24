@@ -24,7 +24,7 @@ export default function Panchang() {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/panchang')
+    fetch('/web-api/panchang')
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('request failed'))))
       .then((data) => {
         if (!cancelled) setPanchang(data)

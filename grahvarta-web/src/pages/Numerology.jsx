@@ -31,7 +31,7 @@ export default function Numerology() {
     setResult(null)
 
     try {
-      const res = await fetch('/api/numerology', {
+      const res = await fetch('/web-api/numerology', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), dob }),

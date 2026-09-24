@@ -4,7 +4,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-RUN npm run build
+ARG VITE_API_URL=https://api.grahvarta.com
+ARG VITE_SOCKET_URL=https://api.grahvarta.com
+RUN VITE_API_URL=$VITE_API_URL VITE_SOCKET_URL=$VITE_SOCKET_URL npm run build
 
 # Stage 2 — serve with nginx
 FROM nginx:alpine

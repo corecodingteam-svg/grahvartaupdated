@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, useLocation } from 'react-router-dom'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   Menu, X, Sparkles, ShoppingCart, Sun, Moon, ChevronDown,
-  ScrollText, HeartHandshake, Hash, Home as HomeIcon, CalendarDays, Clock,
+  ScrollText, HeartHandshake, Hash, Home as HomeIcon, CalendarDays, Clock, UserRound, LogOut,
 } from 'lucide-react'
 import { useCart } from '../../context/CartContext'
 import { useTheme } from '../../context/ThemeContext'
+import { useAuth } from '../../context/AuthContext'
+import { useOpenLogin } from '../../context/RequireAuthContext'
 
 const primaryLinks = [
   { label: 'Home', to: '/' },
@@ -102,10 +104,76 @@ function ToolsDropdown() {
   )
 }
 
+function AccountMenu() {
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef(null)
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  function handleLogout() {
+    logout()
+    setOpen(false)
+    navigate('/')
+  }
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="w-9 h-9 rounded-full bg-orange/10 flex items-center justify-center text-orange font-semibold text-sm shrink-0"
+        aria-label={`Account menu for ${user.name}`}
+      >
+        {user.name?.[0]?.toUpperCase() || <UserRound size={16} />}
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full mt-2 w-48 p-1.5 rounded-2xl border border-border bg-card shadow-xl animate-fade-in"
+        >
+          <p className="px-3 py-2 text-sm font-medium truncate border-b border-divider mb-1">{user.name}</p>
+          <Link
+            to="/account"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-text-secondary hover:text-text-primary hover:bg-surface-light transition-colors"
+          >
+            <UserRound size={15} /> My Account
+          </Link>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-error hover:bg-error/10 transition-colors"
+          >
+            <LogOut size={15} /> Log Out
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Header() {
   const [open, setOpen] = useState(false)
   const { totalItems } = useCart()
   const { isLight, toggleTheme } = useTheme()
+  const { isAuthenticated, user, logout } = useAuth()
+  const openLogin = useOpenLogin()
+  const navigate = useNavigate()
 
   return (
     <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
@@ -157,6 +225,17 @@ export default function Header() {
           <Link to="/astrologers" className="btn-primary !py-2 !px-4 text-sm">
             Talk to Astrologer
           </Link>
+          {isAuthenticated && user ? (
+            <AccountMenu />
+          ) : (
+            <button
+              type="button"
+              onClick={() => openLogin()}
+              className="px-3 py-2 rounded-xl text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-light transition-colors"
+            >
+              Log In
+            </button>
+          )}
         </div>
 
         <div className="lg:hidden flex items-center gap-1">
@@ -250,6 +329,40 @@ export default function Header() {
             >
               Talk to Astrologer
             </Link>
+
+            {isAuthenticated && user ? (
+              <>
+                <Link
+                  to="/account"
+                  onClick={() => setOpen(false)}
+                  className="inline-flex items-center justify-center gap-2 btn-outline mt-3 w-full text-sm"
+                >
+                  <UserRound size={16} /> My Account
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    logout()
+                    setOpen(false)
+                    navigate('/')
+                  }}
+                  className="inline-flex items-center justify-center gap-2 mt-3 w-full text-sm text-error py-2"
+                >
+                  <LogOut size={16} /> Log Out
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  openLogin()
+                }}
+                className="btn-outline mt-3 w-full text-sm"
+              >
+                Log In
+              </button>
+            )}
           </nav>
         </div>
       )}

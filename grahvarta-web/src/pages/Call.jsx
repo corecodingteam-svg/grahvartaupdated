@@ -1,124 +1,217 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams, Navigate } from 'react-router-dom'
-import { Mic, MicOff, Volume2, VolumeX, PhoneOff } from 'lucide-react'
-import toast from 'react-hot-toast'
-import { getAstrologerById } from '../data/astrologers'
+import { useNavigate, useParams, useSearchParams, Navigate } from 'react-router-dom'
+import { Mic, MicOff, PhoneOff, Wallet, Video, VideoOff } from 'lucide-react'
+import { fetchAstrologerById } from '../lib/astrologers'
+import { normalizeAstrologer } from '../lib/astrologerDisplay'
+import { useConsultation } from '../hooks/useConsultation'
+import { useAgoraCall } from '../hooks/useAgoraCall'
+import Avatar from '../components/ui/Avatar'
 import { setPageMeta } from '../lib/demo'
 
 function formatTime(totalSeconds) {
-  const m = Math.floor(totalSeconds / 60)
-    .toString()
-    .padStart(2, '0')
+  const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0')
   const s = (totalSeconds % 60).toString().padStart(2, '0')
   return `${m}:${s}`
 }
 
+const statusLabel = {
+  connecting: 'Connecting…',
+  queued: 'Ringing…',
+}
+
+function VideoTile({ track, mirrored, className = '' }) {
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    if (track && containerRef.current) {
+      track.play(containerRef.current, mirrored ? { mirror: true } : undefined)
+    }
+    return () => {
+      track?.stop()
+    }
+  }, [track, mirrored])
+
+  return <div ref={containerRef} className={`bg-black ${className}`} />
+}
+
 export default function Call() {
   const { id } = useParams()
-  const astrologer = getAstrologerById(id)
+  const [searchParams] = useSearchParams()
+  const isVideo = searchParams.get('type') === 'video'
   const navigate = useNavigate()
 
-  const [status, setStatus] = useState('Connecting...')
-  const [seconds, setSeconds] = useState(0)
-  const [muted, setMuted] = useState(false)
-  const [speakerOn, setSpeakerOn] = useState(true)
+  const [astrologer, setAstrologer] = useState(null)
+  const [notFound, setNotFound] = useState(false)
+
+  const { status, consultationId, errorMessage, elapsedSeconds, endConsultation } = useConsultation({
+    astrologerId: id,
+    type: isVideo ? 'video' : 'voice',
+  })
+  const { connected, muted, toggleMute, cameraOff, toggleCamera, localVideoTrack, remoteVideoTrack, callError } =
+    useAgoraCall({ consultationId, active: status === 'active', withVideo: isVideo })
+
+  useEffect(() => {
+    let cancelled = false
+    fetchAstrologerById(id)
+      .then((raw) => {
+        if (!cancelled) setAstrologer(normalizeAstrologer(raw))
+      })
+      .catch(() => {
+        if (!cancelled) setNotFound(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [id])
 
   useEffect(() => {
     if (astrologer) {
-      setPageMeta(`Call with ${astrologer.name} | GrahVarta`, `Demo call consultation with ${astrologer.name}.`)
+      setPageMeta(
+        `${isVideo ? 'Video call' : 'Call'} with ${astrologer.name} | GrahVarta`,
+        `Live ${isVideo ? 'video ' : ''}call consultation with ${astrologer.name}.`
+      )
     }
-  }, [astrologer])
+  }, [astrologer, isVideo])
 
-  useEffect(() => {
-    const t1 = setTimeout(() => setStatus('Ringing...'), 1200)
-    const t2 = setTimeout(() => setStatus('Connected'), 2800)
-    return () => {
-      clearTimeout(t1)
-      clearTimeout(t2)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (status !== 'Connected') return
-    const timer = setInterval(() => setSeconds((s) => s + 1), 1000)
-    return () => clearInterval(timer)
-  }, [status])
-
-  if (!astrologer) {
+  if (notFound) {
     return <Navigate to="/astrologers" replace />
   }
 
-  function endCall() {
-    toast('Demo call ended', { icon: '✨' })
-    navigate(`/astrologer/profile/${id}`)
+  const displayStatus =
+    status === 'active'
+      ? connected
+        ? `Connected · ${formatTime(elapsedSeconds)}`
+        : 'Connecting audio…'
+      : statusLabel[status] || status
+
+  const inCallScreen = status === 'connecting' || status === 'queued' || status === 'active'
+  const showVideoLayout = isVideo && inCallScreen
+
+  const controls = (
+    <div className="flex items-center gap-5">
+      <button
+        type="button"
+        onClick={toggleMute}
+        disabled={status !== 'active'}
+        className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 ${
+          muted ? 'bg-error/10 text-error' : 'bg-surface-light text-text-secondary'
+        }`}
+        aria-label={muted ? 'Unmute' : 'Mute'}
+      >
+        {muted ? <MicOff size={20} /> : <Mic size={20} />}
+      </button>
+      {isVideo && (
+        <button
+          type="button"
+          onClick={toggleCamera}
+          disabled={status !== 'active'}
+          className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 ${
+            cameraOff ? 'bg-error/10 text-error' : 'bg-surface-light text-text-secondary'
+          }`}
+          aria-label={cameraOff ? 'Turn camera on' : 'Turn camera off'}
+        >
+          {cameraOff ? <VideoOff size={20} /> : <Video size={20} />}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={endConsultation}
+        className="w-16 h-16 rounded-full bg-error text-white flex items-center justify-center"
+        aria-label="End call"
+      >
+        <PhoneOff size={24} />
+      </button>
+    </div>
+  )
+
+  if (showVideoLayout) {
+    return (
+      <div className="fixed inset-0 z-40 bg-black flex flex-col">
+        <div className="relative flex-1">
+          {remoteVideoTrack ? (
+            <VideoTile track={remoteVideoTrack} className="w-full h-full" />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-center">
+              <Avatar src={astrologer?.photo} name={astrologer?.name} size={96} rounded="rounded-full" />
+              <p className="text-white font-semibold">{astrologer?.name || 'Astrologer'}</p>
+              <p className="text-white/70 text-sm">{displayStatus}</p>
+            </div>
+          )}
+
+          {localVideoTrack && !cameraOff && (
+            <VideoTile
+              track={localVideoTrack}
+              mirrored
+              className="absolute top-4 right-4 w-28 h-40 sm:w-36 sm:h-52 rounded-xl overflow-hidden border-2 border-white/20 shadow-lg"
+            />
+          )}
+
+          {remoteVideoTrack && (
+            <div className="absolute top-4 left-4 bg-black/50 backdrop-blur px-3 py-1.5 rounded-full">
+              <p className="text-white text-xs font-medium">{displayStatus}</p>
+            </div>
+          )}
+        </div>
+
+        {callError && (
+          <p className="text-center text-xs text-error bg-black/60 py-1.5">{callError}</p>
+        )}
+
+        <div className="flex items-center justify-center py-6 bg-black/40">{controls}</div>
+      </div>
+    )
   }
 
   return (
-    <div className="container-page py-8 sm:py-12 flex flex-col items-center justify-center min-h-[calc(100vh-64px)] text-center gap-6">
-      <div className="relative">
-        <img
-          src={astrologer.photo}
-          alt={astrologer.name}
-          className="w-32 h-32 sm:w-40 sm:h-40 rounded-full object-cover border-4 border-orange/40"
-        />
-        {status === 'Connected' && (
-          <span className="absolute inset-0 rounded-full border-2 border-orange animate-pulse" aria-hidden="true" />
-        )}
-      </div>
+    <div className="container-page py-10 sm:py-16 max-w-md">
+      <div className="card flex flex-col items-center text-center gap-6 py-10">
+        <Avatar src={astrologer?.photo} name={astrologer?.name} size={112} rounded="rounded-full" />
+        <div>
+          <h1 className="text-xl font-bold">{astrologer?.name || 'Astrologer'}</h1>
+          <p className="text-sm text-text-muted mt-1">{displayStatus}</p>
+        </div>
 
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold">{astrologer.name}</h1>
-        <p className="text-sm text-text-secondary mt-1">₹{astrologer.pricePerMin}/min</p>
-      </div>
-
-      <div className="h-8 flex items-center justify-center">
-        {status === 'Connected' ? (
-          <span className="text-2xl font-mono text-gold" aria-label="Call duration">
-            {formatTime(seconds)}
-          </span>
+        {status === 'rejected' ? (
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-sm text-text-secondary">
+              {astrologer?.name || 'This astrologer'} isn&apos;t available right now.
+            </p>
+            <button type="button" onClick={() => navigate(`/astrologer/profile/${id}`)} className="btn-outline">
+              Back to Profile
+            </button>
+          </div>
+        ) : status === 'insufficient_balance' ? (
+          <div className="flex flex-col items-center gap-3">
+            <Wallet size={28} className="text-orange" />
+            <p className="text-sm text-text-secondary">
+              You don&apos;t have enough wallet balance to start this call.
+            </p>
+            <button type="button" onClick={() => navigate('/account')} className="btn-primary">
+              Add Money to Wallet
+            </button>
+          </div>
+        ) : status === 'error' ? (
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-sm text-error">{errorMessage || 'Something went wrong.'}</p>
+            <button type="button" onClick={() => navigate(`/astrologer/profile/${id}`)} className="btn-outline">
+              Back to Profile
+            </button>
+          </div>
+        ) : status === 'ended' ? (
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-sm text-text-secondary">Call ended.</p>
+            <p className="text-xs text-text-muted">Duration: {formatTime(elapsedSeconds)}</p>
+            <button type="button" onClick={() => navigate(`/astrologer/profile/${id}`)} className="btn-outline">
+              Back to Profile
+            </button>
+          </div>
         ) : (
-          <span className="text-sm text-text-secondary animate-pulse" aria-live="polite">
-            {status}
-          </span>
+          <>
+            {callError && <p className="text-xs text-error">{callError}</p>}
+            {controls}
+          </>
         )}
       </div>
-
-      <div className="flex items-center gap-5 mt-4">
-        <button
-          type="button"
-          onClick={() => setMuted((m) => !m)}
-          aria-label={muted ? 'Unmute microphone' : 'Mute microphone'}
-          aria-pressed={muted}
-          className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-orange ${
-            muted ? 'bg-orange text-white' : 'bg-surface-light text-text-secondary'
-          }`}
-        >
-          {muted ? <MicOff size={20} /> : <Mic size={20} />}
-        </button>
-
-        <button
-          type="button"
-          onClick={endCall}
-          aria-label="End call"
-          className="w-16 h-16 rounded-full flex items-center justify-center bg-error text-white hover:opacity-90 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-error"
-        >
-          <PhoneOff size={24} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSpeakerOn((s) => !s)}
-          aria-label={speakerOn ? 'Turn speaker off' : 'Turn speaker on'}
-          aria-pressed={speakerOn}
-          className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-orange ${
-            speakerOn ? 'bg-orange text-white' : 'bg-surface-light text-text-secondary'
-          }`}
-        >
-          {speakerOn ? <Volume2 size={20} /> : <VolumeX size={20} />}
-        </button>
-      </div>
-
-      <p className="text-[11px] text-text-muted mt-2">This is a demo call — no real audio is connected.</p>
     </div>
   )
 }

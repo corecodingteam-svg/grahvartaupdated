@@ -111,6 +111,27 @@ exports.getConsultationHistory = async (req, res) => {
 
 exports.getConsultationMessages = async (req, res) => {
   try {
+    // Ownership check — without this, any authenticated user could read any
+    // consultation's messages by ID (this endpoint has no other access
+    // control). A caller must be either the consultation's user or the
+    // astrologer it belongs to.
+    const consultation = await db.query(
+      `SELECT c.user_id, a.user_id AS astrologer_user_id
+       FROM consultations c
+       JOIN astrologers a ON a.id = c.astrologer_id
+       WHERE c.id = $1`,
+      [req.params.id]
+    );
+
+    if (!consultation.rows.length) {
+      return res.status(404).json({ success: false, message: 'Consultation not found' });
+    }
+
+    const { user_id, astrologer_user_id } = consultation.rows[0];
+    if (req.user.id !== user_id && req.user.id !== astrologer_user_id) {
+      return res.status(403).json({ success: false, message: 'Not authorized to view this consultation' });
+    }
+
     const result = await db.query(
       `SELECT * FROM consultation_messages WHERE consultation_id = $1 ORDER BY created_at ASC`,
       [req.params.id]

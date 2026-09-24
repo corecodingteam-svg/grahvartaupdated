@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   MessageCircle, Phone, Sun, ScrollText, Heart, Gem, Briefcase, UserRound,
@@ -7,9 +7,11 @@ import {
   ShieldCheck, Signal, Wifi, BatteryFull, ChevronLeft, BadgeCheck, Send,
 } from 'lucide-react'
 import SectionHeading from '../components/ui/SectionHeading'
+import Card from '../components/ui/Card'
 import AstrologerCard from '../components/astrologer/AstrologerCard'
 import TestimonialSlider from '../components/ui/TestimonialSlider'
-import { astrologers } from '../data/astrologers'
+import { fetchAstrologers } from '../lib/astrologers'
+import { normalizeAstrologer } from '../lib/astrologerDisplay'
 import { categories } from '../data/categories'
 import { services, zodiacSigns, testimonials } from '../data/services'
 import { blogArticles } from '../data/blog'
@@ -35,10 +37,22 @@ export default function Home() {
     )
   }, [])
 
-  const liveAstrologers = useMemo(
-    () => astrologers.filter((a) => a.online).slice(0, 8),
-    []
-  )
+  const [liveAstrologers, setLiveAstrologers] = useState(null)
+  const [astrologersError, setAstrologersError] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchAstrologers({ limit: 8, sort: 'popular', onlineOnly: true })
+      .then(({ list }) => {
+        if (!cancelled) setLiveAstrologers(list.map(normalizeAstrologer))
+      })
+      .catch(() => {
+        if (!cancelled) setAstrologersError(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const blogTeasers = useMemo(() => blogArticles.slice(0, 4), [])
 
@@ -107,11 +121,23 @@ export default function Home() {
           actionLabel="View all"
           actionTo="/astrologers"
         />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {liveAstrologers.map((a) => (
-            <AstrologerCard key={a.id} astrologer={a} />
-          ))}
-        </div>
+        {liveAstrologers === null ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i} className="h-48 animate-pulse" />
+            ))}
+          </div>
+        ) : astrologersError ? (
+          <p className="text-sm text-text-muted">Could not load live astrologers right now.</p>
+        ) : liveAstrologers.length === 0 ? (
+          <p className="text-sm text-text-muted">No astrologers are online right now — check back soon.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {liveAstrologers.map((a) => (
+              <AstrologerCard key={a.id} astrologer={a} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Browse by category */}
@@ -123,7 +149,7 @@ export default function Home() {
             return (
               <Link
                 key={cat.id}
-                to={`/astrologers?category=${cat.id}`}
+                to={`/astrologers?q=${encodeURIComponent(cat.label)}`}
                 className="card flex flex-col items-center text-center gap-2 py-6 hover:border-orange/50 transition-colors"
               >
                 <span className="w-11 h-11 rounded-xl bg-gold/10 flex items-center justify-center text-gold">

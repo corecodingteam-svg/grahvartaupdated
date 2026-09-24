@@ -1,177 +1,209 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, Navigate } from 'react-router-dom'
-import { ArrowLeft, Send } from 'lucide-react'
-import toast from 'react-hot-toast'
-import { getAstrologerById } from '../data/astrologers'
+import { ArrowLeft, Send, PhoneOff, Wallet } from 'lucide-react'
+import { fetchAstrologerById } from '../lib/astrologers'
+import { normalizeAstrologer } from '../lib/astrologerDisplay'
+import { useConsultation } from '../hooks/useConsultation'
+import { useAuth } from '../context/AuthContext'
+import Avatar from '../components/ui/Avatar'
 import { setPageMeta } from '../lib/demo'
 
-const cannedReplies = [
-  'I sense there is more to your situation — could you tell me a bit more?',
-  'The planetary positions suggest this phase will bring positive change soon.',
-  'That is a common concern — with patience and the right remedies, things will improve.',
-  'Your chart shows strong potential here. Let us look at it more closely.',
-  'Trust the process — the stars indicate favourable timing ahead.',
-]
-
 function formatTime(totalSeconds) {
-  const m = Math.floor(totalSeconds / 60)
-    .toString()
-    .padStart(2, '0')
+  const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0')
   const s = (totalSeconds % 60).toString().padStart(2, '0')
   return `${m}:${s}`
 }
 
+const statusCopy = {
+  connecting: 'Connecting…',
+  queued: 'Waiting for the astrologer to accept…',
+}
+
 export default function Chat() {
   const { id } = useParams()
-  const astrologer = getAstrologerById(id)
   const navigate = useNavigate()
+  const { user } = useAuth()
 
-  const [seconds, setSeconds] = useState(0)
-  const [messages, setMessages] = useState(() =>
-    astrologer
-      ? [
-          { id: 'm1', from: 'astrologer', text: `Namaste! I am ${astrologer.name}. How can I help you today?` },
-          { id: 'm2', from: 'user', text: 'Hi, I wanted to ask about my career prospects this year.' },
-          { id: 'm3', from: 'astrologer', text: 'Sure, let me take a look at your chart. Could you share your date of birth?' },
-        ]
-      : []
-  )
-  const [input, setInput] = useState('')
-  const replyIndexRef = useRef(0)
-  const replyTimeoutRef = useRef(null)
+  const [astrologer, setAstrologer] = useState(null)
+  const [notFound, setNotFound] = useState(false)
+  const [text, setText] = useState('')
   const messagesEndRef = useRef(null)
+  const typingTimeoutRef = useRef(null)
+
+  const {
+    status, errorMessage, messages, peerTyping, elapsedSeconds, sendMessage, setTyping, endConsultation,
+  } = useConsultation({ astrologerId: id, type: 'chat' })
+
+  useEffect(() => {
+    let cancelled = false
+    fetchAstrologerById(id)
+      .then((raw) => {
+        if (!cancelled) setAstrologer(normalizeAstrologer(raw))
+      })
+      .catch(() => {
+        if (!cancelled) setNotFound(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [id])
 
   useEffect(() => {
     if (astrologer) {
-      setPageMeta(`Chat with ${astrologer.name} | GrahVarta`, `Demo chat consultation with ${astrologer.name}.`)
+      setPageMeta(`Chat with ${astrologer.name} | GrahVarta`, `Live chat consultation with ${astrologer.name}.`)
     }
   }, [astrologer])
-
-  useEffect(() => {
-    const timer = setInterval(() => setSeconds((s) => s + 1), 1000)
-    return () => clearInterval(timer)
-  }, [])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  useEffect(() => {
-    return () => {
-      if (replyTimeoutRef.current) clearTimeout(replyTimeoutRef.current)
-    }
-  }, [])
-
-  if (!astrologer) {
+  if (notFound) {
     return <Navigate to="/astrologers" replace />
   }
 
-  function sendMessage() {
-    const text = input.trim()
-    if (!text) return
-    const userMsg = { id: `u-${Date.now()}`, from: 'user', text }
-    setMessages((prev) => [...prev, userMsg])
-    setInput('')
-
-    replyTimeoutRef.current = setTimeout(() => {
-      const reply = cannedReplies[replyIndexRef.current % cannedReplies.length]
-      replyIndexRef.current += 1
-      setMessages((prev) => [...prev, { id: `a-${Date.now()}`, from: 'astrologer', text: reply }])
-    }, 1200)
+  function handleInputChange(e) {
+    setText(e.target.value)
+    setTyping(true)
+    clearTimeout(typingTimeoutRef.current)
+    typingTimeoutRef.current = setTimeout(() => setTyping(false), 1500)
   }
 
-  function handleKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
+  function handleSend(e) {
+    e.preventDefault()
+    if (!text.trim()) return
+    sendMessage(text)
+    setText('')
+    setTyping(false)
   }
 
-  function endChat() {
-    toast('Demo chat ended', { icon: '✨' })
-    navigate(`/astrologer/profile/${id}`)
+  function handleEnd() {
+    endConsultation()
   }
+
+  const isOwnMessage = (msg) => (msg.sender_type ? msg.sender_type === 'user' : msg.sender_id === user?.id)
 
   return (
-    <div className="container-page py-4 sm:py-6 flex flex-col h-[calc(100vh-64px)] max-h-[calc(100vh-64px)]">
-      <h1 className="sr-only">Chat with {astrologer.name}</h1>
-      {/* Header */}
-      <div className="card flex items-center justify-between gap-3 !py-3 shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <button
-            type="button"
-            onClick={() => navigate(`/astrologer/profile/${id}`)}
-            className="text-text-secondary hover:text-orange shrink-0"
-            aria-label="Back to profile"
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <div className="relative shrink-0">
-            <img src={astrologer.photo} alt={astrologer.name} className="w-10 h-10 rounded-xl object-cover border border-border" />
-            <span
-              className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card ${
-                astrologer.online ? 'bg-success' : 'bg-text-muted'
-              }`}
-              aria-label={astrologer.online ? 'Online' : 'Offline'}
-            />
-          </div>
-          <div className="min-w-0">
-            <p className="font-semibold text-sm truncate">{astrologer.name}</p>
-            <p className="text-xs text-text-secondary">₹{astrologer.pricePerMin}/min</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="text-xs font-mono text-gold" aria-label="Consultation duration">
-            {formatTime(seconds)}
-          </span>
-          <button type="button" onClick={endChat} className="btn-outline !py-1.5 !px-3 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-orange">
-            End Chat
-          </button>
-        </div>
-      </div>
+    <div className="container-page py-6 sm:py-8 max-w-2xl">
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-orange mb-4"
+      >
+        <ArrowLeft size={16} /> Back
+      </button>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto py-4 flex flex-col gap-3">
-        {messages.map((m) => (
-          <div key={m.id} className={`flex ${m.from === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div
-              className={`max-w-[75%] sm:max-w-[60%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                m.from === 'user' ? 'bg-orange text-white' : 'bg-card border border-border text-text-primary'
-              }`}
+      <div className="card flex flex-col h-[70vh] overflow-hidden !p-0">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
+          <Avatar src={astrologer?.photo} name={astrologer?.name} size={40} online={status === 'active'} />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold truncate">{astrologer?.name || 'Astrologer'}</p>
+            <p className="text-xs text-text-muted">
+              {status === 'active' ? `Live · ${formatTime(elapsedSeconds)}` : statusCopy[status] || status}
+            </p>
+          </div>
+          {status === 'active' && (
+            <button
+              type="button"
+              onClick={handleEnd}
+              className="w-9 h-9 rounded-xl bg-error/10 flex items-center justify-center text-error hover:bg-error/20 transition-colors"
+              aria-label="End chat"
             >
-              {m.text}
-            </div>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
-      <div className="shrink-0 pt-2">
-        <div className="flex items-center gap-2 card !p-2">
-          <label htmlFor="chat-message-input" className="sr-only">
-            Type your message
-          </label>
-          <input
-            id="chat-message-input"
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type your message..."
-            className="flex-1 bg-transparent outline-none text-sm px-2 text-text-primary placeholder:text-text-muted"
-          />
-          <button
-            type="button"
-            onClick={sendMessage}
-            disabled={!input.trim()}
-            className="w-10 h-10 rounded-xl bg-orange flex items-center justify-center text-white disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-orange"
-            aria-label="Send message"
-          >
-            <Send size={16} />
-          </button>
+              <PhoneOff size={16} />
+            </button>
+          )}
         </div>
-        <p className="text-[11px] text-text-muted text-center mt-2">This is a demo chat — replies are simulated.</p>
+
+        {/* Body */}
+        {status === 'connecting' || status === 'queued' ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6">
+            <span className="w-12 h-12 rounded-full border-4 border-surface-light border-t-orange animate-spin" />
+            <p className="text-sm text-text-secondary">{statusCopy[status]}</p>
+          </div>
+        ) : status === 'rejected' ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
+            <p className="text-sm text-text-secondary">
+              {astrologer?.name || 'This astrologer'} isn&apos;t available right now.
+            </p>
+            <button type="button" onClick={() => navigate(`/astrologer/profile/${id}`)} className="btn-outline">
+              Back to Profile
+            </button>
+          </div>
+        ) : status === 'insufficient_balance' ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
+            <Wallet size={28} className="text-orange" />
+            <p className="text-sm text-text-secondary">
+              You don&apos;t have enough wallet balance to start this consultation.
+            </p>
+            <button type="button" onClick={() => navigate('/account')} className="btn-primary">
+              Add Money to Wallet
+            </button>
+          </div>
+        ) : status === 'error' ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
+            <p className="text-sm text-error">{errorMessage || 'Something went wrong.'}</p>
+            <button type="button" onClick={() => navigate(`/astrologer/profile/${id}`)} className="btn-outline">
+              Back to Profile
+            </button>
+          </div>
+        ) : status === 'ended' ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
+            <p className="text-sm text-text-secondary">This consultation has ended.</p>
+            <p className="text-xs text-text-muted">Duration: {formatTime(elapsedSeconds)}</p>
+            <button type="button" onClick={() => navigate(`/astrologer/profile/${id}`)} className="btn-outline">
+              Back to Profile
+            </button>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2.5">
+            {messages.length === 0 && (
+              <p className="text-xs text-text-muted text-center mt-4">
+                You&apos;re connected — say hello to get started.
+              </p>
+            )}
+            {messages.map((msg, i) => {
+              const own = isOwnMessage(msg)
+              return (
+                <div
+                  key={msg.id || i}
+                  className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                    own
+                      ? 'self-end bg-orange text-white rounded-tr-sm'
+                      : 'self-start bg-surface-light text-text-primary rounded-tl-sm'
+                  }`}
+                >
+                  {msg.content}
+                </div>
+              )
+            })}
+            {peerTyping && (
+              <p className="text-xs text-text-muted italic">{astrologer?.name || 'Astrologer'} is typing…</p>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+
+        {/* Input */}
+        {status === 'active' && (
+          <form onSubmit={handleSend} className="flex items-center gap-2 px-3 py-3 border-t border-border shrink-0">
+            <input
+              type="text"
+              value={text}
+              onChange={handleInputChange}
+              placeholder="Type a message…"
+              className="input-field flex-1 !py-2.5"
+            />
+            <button
+              type="submit"
+              disabled={!text.trim()}
+              className="w-10 h-10 rounded-xl bg-orange text-white flex items-center justify-center disabled:opacity-40 shrink-0"
+              aria-label="Send message"
+            >
+              <Send size={16} />
+            </button>
+          </form>
+        )}
       </div>
     </div>
   )

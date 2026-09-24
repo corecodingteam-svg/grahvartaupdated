@@ -32,7 +32,7 @@ export default function LoveCalculator() {
     setResult(null)
 
     try {
-      const res = await fetch('/api/love-calculator', {
+      const res = await fetch('/web-api/love-calculator', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), partner: partner.trim() }),
