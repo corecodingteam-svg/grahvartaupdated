@@ -18,19 +18,25 @@
     --color-success: 67 160 71;
   }
 
-  /* Day theme — adapted from the astrologer_app Flutter LightColors palette */
+  /* Day theme — white base with a warm cream-to-orange wash (orange twist on
+     the astrotalk.com white/yellow look), warm neutrals for surfaces and text. */
   :root[data-theme='light'] {
     --color-background: 255 255 255;
-    --color-surface: 238 244 255;
-    --color-surface-light: 229 238 255;
-    --color-card: 240 246 255;
-    --color-text-primary: 4 43 89;
-    --color-text-secondary: 5 83 177;
-    --color-text-muted: 102 102 102;
-    --color-border: 200 216 240;
-    --color-divider: 213 229 245;
-    --color-error: 242 93 80;
-    --color-success: 28 218 197;
+    --color-surface: 255 247 237;
+    --color-surface-light: 255 237 213;
+    --color-card: 255 252 247;
+    --color-text-primary: 33 24 16;
+    --color-text-secondary: 92 68 48;
+    --color-text-muted: 120 108 98;
+    --color-border: 245 219 188;
+    --color-divider: 250 232 210;
+    --color-error: 229 57 53;
+    --color-success: 43 160 90;
+  }
+
+  :root[data-theme='light'] body {
+    background-image: linear-gradient(168deg, #fff 0%, #fffaf3 30%, #ffefdb 60%, #ffcf9e 100%);
+    background-attachment: fixed;
   }
 
   body {
