@@ -32,19 +32,13 @@ const ProductDetail = lazy(() => import('./pages/ProductDetail'))
 const Cart = lazy(() => import('./pages/Cart'))
 const Blog = lazy(() => import('./pages/Blog'))
 const BlogArticle = lazy(() => import('./pages/BlogArticle'))
+const About = lazy(() => import('./pages/About'))
+const Contact = lazy(() => import('./pages/Contact'))
+const TermsOfUse = lazy(() => import('./pages/TermsOfUse'))
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const StoryPrivacyPolicy = lazy(() => import('./pages/StoryPrivacyPolicy'))
 const Account = lazy(() => import('./pages/Account'))
 const LiveView = lazy(() => import('./pages/LiveView'))
-
-// Future-phase features get a nav link now, but route to ComingSoon so the
-// site never 404s while pages roll out incrementally.
-const comingSoonRoutes = [
-  { path: '/about', feature: 'About Us' },
-  { path: '/contact', feature: 'Contact Us' },
-  { path: '/careers', feature: 'Careers' },
-  { path: '/privacy', feature: 'Privacy Policy' },
-  { path: '/terms', feature: 'Terms of Use' },
-]
 
 function PageLoader() {
   return (
@@ -113,11 +107,12 @@ export default function App() {
             <Route path="/cart" element={<Cart />} />
             <Route path="/account" element={<Account />} />
             <Route path="/live/:sessionId" element={<LiveView />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/terms" element={<TermsOfUse />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogArticle />} />
-            {comingSoonRoutes.map((r) => (
-              <Route key={r.path} path={r.path} element={<ComingSoon feature={r.feature} />} />
-            ))}
             <Route path="*" element={<ComingSoon feature="This page" />} />
           </Route>
         </Routes>
