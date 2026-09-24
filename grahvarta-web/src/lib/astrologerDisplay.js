@@ -1,13 +1,21 @@
 // Normalizes the real `astrologers` table shape (backend/migrations/002_marketplace.sql)
 // into the flat fields the UI components use — one place to adapt if the
 // backend response shape ever changes, instead of five.
+export function capitalizeName(name) {
+  return String(name || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+    .replace(/(^|[\s.'-])(\p{L})/gu, (_, sep, ch) => sep + ch.toUpperCase())
+}
+
 export function normalizeAstrologer(raw) {
   if (!raw) return null
   const tags = raw.specializations?.length ? raw.specializations : raw.expertise_areas || []
 
   return {
     id: raw.id,
-    name: raw.display_name || raw.name || 'Astrologer',
+    name: capitalizeName(raw.display_name || raw.name) || 'Astrologer',
     photo: raw.avatar_url || null,
     badge: raw.verification_badge || (raw.is_verified ? 'Verified' : null),
     expertise: tags,
