@@ -1292,7 +1292,7 @@ export default function Account() {
     <div className="container-page py-8 sm:py-12">
       <SectionHeading level="h1" eyebrow="Your Account" title="My Account" />
 
-      <div className="flex flex-col lg:flex-row gap-6 max-w-5xl">
+      <div className="flex flex-col lg:flex-row gap-6">
         <aside className="lg:w-56 shrink-0">
           <div className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible">
             {tabs.map(({ id, label, icon: Icon }) => (

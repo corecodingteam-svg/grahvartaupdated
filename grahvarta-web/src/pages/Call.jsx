@@ -17,6 +17,10 @@ function formatTime(totalSeconds) {
 const statusLabel = {
   connecting: 'Connecting…',
   queued: 'Ringing…',
+  rejected: 'Not available right now',
+  insufficient_balance: 'Low wallet balance',
+  ended: 'Call ended',
+  error: 'Connection problem',
 }
 
 function VideoTile({ track, mirrored, className = '' }) {
@@ -163,7 +167,7 @@ export default function Call() {
   }
 
   return (
-    <div className="container-page py-10 sm:py-16 max-w-md">
+    <div className="container-page py-10 sm:py-16">
       <div className="card flex flex-col items-center text-center gap-6 py-10">
         <Avatar src={astrologer?.photo} name={astrologer?.name} size={112} rounded="rounded-full" />
         <div>

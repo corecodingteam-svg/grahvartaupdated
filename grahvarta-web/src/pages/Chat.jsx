@@ -17,6 +17,10 @@ function formatTime(totalSeconds) {
 const statusCopy = {
   connecting: 'Connecting…',
   queued: 'Waiting for the astrologer to accept…',
+  rejected: 'Not available right now',
+  insufficient_balance: 'Low wallet balance',
+  ended: 'Chat ended',
+  error: 'Connection problem',
 }
 
 export default function Chat() {
@@ -84,7 +88,7 @@ export default function Chat() {
   const isOwnMessage = (msg) => (msg.sender_type ? msg.sender_type === 'user' : msg.sender_id === user?.id)
 
   return (
-    <div className="container-page py-6 sm:py-8 max-w-2xl">
+    <div className="container-page py-6 sm:py-8">
       <button
         type="button"
         onClick={() => navigate(-1)}

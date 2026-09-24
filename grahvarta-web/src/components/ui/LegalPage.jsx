@@ -14,7 +14,7 @@ export default function LegalPage({ title, metaDescription, effectiveDate, secti
     <div className="container-page py-8 sm:py-12">
       <SectionHeading level="h1" eyebrow="Legal" title={title} subtitle={`Effective date: ${effectiveDate}`} />
 
-      <div className="grid lg:grid-cols-[14rem_1fr] gap-8 max-w-5xl">
+      <div className="grid lg:grid-cols-[14rem_1fr] gap-8">
         <nav aria-label={`${title} sections`} className="hidden lg:block">
           <ul className="sticky top-24 flex flex-col gap-1 text-sm">
             {sections.map((s, i) => (
