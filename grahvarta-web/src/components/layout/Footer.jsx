@@ -85,7 +85,7 @@ export default function Footer() {
       <div className="border-t border-border">
         <div className="container-page py-5 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="text-xs text-text-muted text-center">
-            &copy; {new Date().getFullYear()} GrahVarta. All rights reserved. Demo site for illustration only.
+            &copy; {new Date().getFullYear()} GrahVarta. All rights reserved.
           </p>
           <div className="flex items-center gap-4 text-xs text-text-muted">
             <Link to="/privacy" className="hover:text-orange transition-colors">Privacy Policy</Link>

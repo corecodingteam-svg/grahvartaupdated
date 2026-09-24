@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+@keyframes revealUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pageIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheen {
+  to { transform: translateX(120%) skewX(-20deg); }
+}
+
 @layer base {
   :root {
     /* Dark theme (default) */
@@ -71,7 +86,21 @@
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 bg-orange text-white font-semibold py-3 px-6 rounded-xl hover:bg-orange-light transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply relative overflow-hidden inline-flex items-center justify-center gap-2 bg-orange text-white font-semibold py-3 px-6 rounded-xl hover:bg-orange-light transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-120%) skewX(-20deg);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    pointer-events: none;
+  }
+  @media (hover: hover) {
+    .btn-primary:not(:disabled):hover::after {
+      animation: sheen 0.8s ease-out;
+    }
   }
 
   .btn-outline {
@@ -130,6 +159,56 @@
   @media (prefers-reduced-motion: reduce) {
     .card:not(.card-static):hover {
       transform: none;
+    }
+  }
+
+  /* Skeleton shimmer: a soft highlight sweeps across a placeholder block. */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+    background-color: rgb(var(--color-surface-light));
+  }
+  .shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+  :root[data-theme='light'] .shimmer::after {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+  }
+
+  /* Scroll reveal (see components/ui/Reveal). Hidden only until in view;
+     `backwards` fill leaves no lingering transform afterwards. */
+  .reveal:not(.reveal-in) {
+    opacity: 0;
+  }
+  .reveal-in {
+    animation: revealUp 0.65s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .reveal-in .stagger-children > * {
+    animation: revealUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .reveal-in .stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
+  .reveal-in .stagger-children > *:nth-child(2) { animation-delay: 0.12s; }
+  .reveal-in .stagger-children > *:nth-child(3) { animation-delay: 0.19s; }
+  .reveal-in .stagger-children > *:nth-child(4) { animation-delay: 0.26s; }
+  .reveal-in .stagger-children > *:nth-child(n + 5) { animation-delay: 0.32s; }
+
+  .page-enter {
+    animation: pageIn 0.35s ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal:not(.reveal-in) { opacity: 1; }
+    .reveal-in,
+    .reveal-in .stagger-children > *,
+    .page-enter,
+    .shimmer::after,
+    .btn-primary::after {
+      animation: none !important;
     }
   }
 

@@ -6,8 +6,9 @@ import {
   HeartHandshake, Orbit, CalendarDays, Clock,
   ShieldCheck, Signal, Wifi, BatteryFull, ChevronLeft, BadgeCheck, Send,
 } from 'lucide-react'
+import { AstrologerCardSkeleton } from '../components/ui/Skeleton'
+import Reveal from '../components/ui/Reveal'
 import SectionHeading from '../components/ui/SectionHeading'
-import Card from '../components/ui/Card'
 import AstrologerCard from '../components/astrologer/AstrologerCard'
 import TestimonialSlider from '../components/ui/TestimonialSlider'
 import { fetchAstrologers } from '../lib/astrologers'
@@ -95,7 +96,7 @@ export default function Home() {
       </section>
 
       {/* Quick actions */}
-      <section className="container-page py-10 sm:py-14">
+      <Reveal as="section" className="container-page py-10 sm:py-14">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           {quickActions.map(({ label, icon: Icon, to }) => (
             <Link
@@ -110,10 +111,10 @@ export default function Home() {
             </Link>
           ))}
         </div>
-      </section>
+      </Reveal>
 
       {/* Live astrologers */}
-      <section className="container-page py-10 sm:py-14">
+      <Reveal as="section" className="container-page py-10 sm:py-14">
         <SectionHeading
           eyebrow="Available Now"
           title="Live Astrologers"
@@ -122,9 +123,9 @@ export default function Home() {
           actionTo="/astrologers"
         />
         {liveAstrologers === null ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="h-48 animate-pulse" />
+              <AstrologerCardSkeleton key={i} />
             ))}
           </div>
         ) : astrologersError ? (
@@ -132,16 +133,16 @@ export default function Home() {
         ) : liveAstrologers.length === 0 ? (
           <p className="text-sm text-text-muted">No astrologers are online right now — check back soon.</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
             {liveAstrologers.map((a) => (
               <AstrologerCard key={a.id} astrologer={a} />
             ))}
           </div>
         )}
-      </section>
+      </Reveal>
 
       {/* Browse by category */}
-      <section className="container-page py-10 sm:py-14">
+      <Reveal as="section" className="container-page py-10 sm:py-14">
         <SectionHeading eyebrow="Explore" title="Browse by Category" />
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
           {categories.map((cat) => {
@@ -160,10 +161,10 @@ export default function Home() {
             )
           })}
         </div>
-      </section>
+      </Reveal>
 
       {/* Services grid */}
-      <section className="container-page py-10 sm:py-14">
+      <Reveal as="section" className="container-page py-10 sm:py-14">
         <SectionHeading eyebrow="What we offer" title="Our Services" />
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {services.map((service) => {
@@ -182,10 +183,10 @@ export default function Home() {
             )
           })}
         </div>
-      </section>
+      </Reveal>
 
       {/* Daily horoscope strip */}
-      <section className="container-page py-10 sm:py-14">
+      <Reveal as="section" className="container-page py-10 sm:py-14">
         <SectionHeading eyebrow="Zodiac" title="Daily Horoscope" subtitle="Tap your sign to see today's outlook." />
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
           {zodiacSigns.map((sign) => (
@@ -199,16 +200,16 @@ export default function Home() {
             </Link>
           ))}
         </div>
-      </section>
+      </Reveal>
 
       {/* Testimonials */}
-      <section className="container-page py-10 sm:py-14">
+      <Reveal as="section" className="container-page py-10 sm:py-14">
         <SectionHeading eyebrow="Reviews" title="What our users say" />
         <TestimonialSlider items={testimonials} />
-      </section>
+      </Reveal>
 
       {/* App download */}
-      <section className="container-page py-10 sm:py-16">
+      <Reveal as="section" className="container-page py-10 sm:py-16">
         <div className="relative overflow-hidden rounded-3xl border border-border">
           <div className="absolute inset-0 bg-gradient-to-br from-orange/10 via-transparent to-gold/10" aria-hidden="true" />
           <div className="relative grid lg:grid-cols-2 gap-10 items-center p-8 sm:p-12">
@@ -316,12 +317,12 @@ export default function Home() {
             </div>
           </div>
         </div>
-      </section>
+      </Reveal>
 
       {/* Blog teasers */}
-      <section className="container-page py-10 sm:py-16">
+      <Reveal as="section" className="container-page py-10 sm:py-16">
         <SectionHeading eyebrow="Learn" title="Astrology Insights" actionLabel="View all" actionTo="/blog" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
           {blogTeasers.map((post) => (
             <Link
               key={post.slug}
@@ -334,7 +335,7 @@ export default function Home() {
             </Link>
           ))}
         </div>
-      </section>
+      </Reveal>
     </div>
   )
 }

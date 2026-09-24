@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Search, SlidersHorizontal } from 'lucide-react'
 import AstrologerCard from '../components/astrologer/AstrologerCard'
-import Card from '../components/ui/Card'
+import { AstrologerCardSkeleton } from '../components/ui/Skeleton'
 import SectionHeading from '../components/ui/SectionHeading'
 import { fetchAstrologers, sortOptions } from '../lib/astrologers'
 import { normalizeAstrologer } from '../lib/astrologerDisplay'
@@ -272,7 +272,7 @@ export default function Astrologers() {
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
-                <Card key={i} className="h-48 animate-pulse" />
+                <AstrologerCardSkeleton key={i} />
               ))}
             </div>
           ) : error ? (
