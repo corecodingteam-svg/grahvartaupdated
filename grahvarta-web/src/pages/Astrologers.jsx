@@ -149,7 +149,7 @@ export default function Astrologers() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search astrologers"
-                  className="input-field pl-9"
+                  className="input-field pl-9 !py-2 text-base lg:!text-xs"
                 />
               </div>
             </div>
@@ -159,7 +159,7 @@ export default function Astrologers() {
                 <label htmlFor="expertise" className="text-xs text-text-secondary font-medium mb-1.5 block">
                   Expertise
                 </label>
-                <select id="expertise" value={expertise} onChange={(e) => setExpertise(e.target.value)} className="input-field">
+                <select id="expertise" value={expertise} onChange={(e) => setExpertise(e.target.value)} className="input-field !py-2 text-base lg:!text-xs">
                   <option value="">All expertise</option>
                   {allExpertise.map((e) => (
                     <option key={e} value={e}>{e}</option>
@@ -173,7 +173,7 @@ export default function Astrologers() {
                 <label htmlFor="language" className="text-xs text-text-secondary font-medium mb-1.5 block">
                   Language
                 </label>
-                <select id="language" value={language} onChange={(e) => setLanguage(e.target.value)} className="input-field">
+                <select id="language" value={language} onChange={(e) => setLanguage(e.target.value)} className="input-field !py-2 text-base lg:!text-xs">
                   <option value="">All languages</option>
                   {allLanguages.map((l) => (
                     <option key={l} value={l}>{l}</option>
@@ -232,12 +232,12 @@ export default function Astrologers() {
               />
             </div>
 
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
               <input
                 type="checkbox"
                 checked={onlineOnly}
                 onChange={(e) => setOnlineOnly(e.target.checked)}
-                className="accent-orange w-4 h-4"
+                className="accent-orange w-3.5 h-3.5"
               />
               Online only
             </label>
