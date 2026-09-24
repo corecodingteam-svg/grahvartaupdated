@@ -38,6 +38,15 @@
     background-attachment: fixed;
   }
 
+  /* Tailwind sizes are rem-based, so this scales all text and spacing ~6%
+     smaller on tablets/desktops. Phones keep 16px so inputs don't trigger
+     iOS focus-zoom. */
+  @media (min-width: 768px) {
+    html {
+      font-size: 15px;
+    }
+  }
+
   body {
     @apply bg-background text-text-primary font-sans transition-colors duration-300;
   }
