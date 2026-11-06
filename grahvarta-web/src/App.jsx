@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
+import ExternalRedirect from './components/routing/ExternalRedirect'
 import { Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import Layout from './components/layout/Layout'
@@ -27,8 +28,6 @@ const Numerology = lazy(() => import('./pages/Numerology'))
 const Vastu = lazy(() => import('./pages/Vastu'))
 const Puja = lazy(() => import('./pages/Puja'))
 const PujaDetail = lazy(() => import('./pages/PujaDetail'))
-const Shop = lazy(() => import('./pages/Shop'))
-const ProductDetail = lazy(() => import('./pages/ProductDetail'))
 const Cart = lazy(() => import('./pages/Cart'))
 const Blog = lazy(() => import('./pages/Blog'))
 const BlogArticle = lazy(() => import('./pages/BlogArticle'))
@@ -102,8 +101,8 @@ export default function App() {
             <Route path="/vastu" element={<Vastu />} />
             <Route path="/puja" element={<Puja />} />
             <Route path="/puja/:slug" element={<PujaDetail />} />
-            <Route path="/shop" element={<Shop />} />
-            <Route path="/shop/:slug" element={<ProductDetail />} />
+            <Route path="/shop" element={<ExternalRedirect />} />
+            <Route path="/shop/*" element={<ExternalRedirect />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/account" element={<Account />} />
             <Route path="/live/:sessionId" element={<LiveView />} />
