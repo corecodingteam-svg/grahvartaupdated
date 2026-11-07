@@ -22,7 +22,7 @@ export function pickFromHash(hash, array) {
   return array[hash % array.length]
 }
 
-const DEFAULT_OG_IMAGE = 'https://picsum.photos/seed/grahvarta-og-default/1200/630'
+const DEFAULT_OG_IMAGE = 'https://grahvarta.com/brand/og-image.png'
 
 function upsertMeta(attr, key, content) {
   if (!content) return

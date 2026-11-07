@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Sparkles, Facebook, Instagram, Twitter, Youtube } from 'lucide-react'
+import { Facebook, Instagram, Twitter, Youtube } from 'lucide-react'
 
 const columns = [
   {
@@ -40,9 +40,7 @@ export default function Footer() {
       <div className="container-page py-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
         <div>
           <Link to="/" className="flex items-center gap-2 mb-3">
-            <span className="w-9 h-9 rounded-xl bg-orange flex items-center justify-center">
-              <Sparkles size={18} className="text-white" />
-            </span>
+            <img src="/brand/logo-96.png" srcSet="/brand/logo-96.png 1x, /brand/logo-192.png 2x" alt="" width="40" height="40" className="w-10 h-10 shrink-0" />
             <span translate="no" className="text-lg font-bold">
               Grah<span className="text-orange">Varta</span>
             </span>

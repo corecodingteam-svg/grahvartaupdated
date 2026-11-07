@@ -180,9 +180,7 @@ export default function Header() {
     <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
       <div className="container-page flex items-center justify-between h-16">
         <Link to="/" className="flex items-center gap-2 shrink-0" aria-label="GrahVarta home">
-          <span className="w-9 h-9 rounded-xl bg-orange flex items-center justify-center">
-            <Sparkles size={18} className="text-white" />
-          </span>
+          <img src="/brand/logo-96.png" srcSet="/brand/logo-96.png 1x, /brand/logo-192.png 2x" alt="" width="40" height="40" className="w-10 h-10 shrink-0" />
           <span translate="no" className="text-lg font-bold tracking-tight">
             Grah<span className="text-orange">Varta</span>
           </span>
