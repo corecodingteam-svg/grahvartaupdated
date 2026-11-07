@@ -35,6 +35,7 @@ const About = lazy(() => import('./pages/About'))
 const Contact = lazy(() => import('./pages/Contact'))
 const TermsOfUse = lazy(() => import('./pages/TermsOfUse'))
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
+const DeleteAccount = lazy(() => import('./pages/DeleteAccount'))
 const StoryPrivacyPolicy = lazy(() => import('./pages/StoryPrivacyPolicy'))
 const Account = lazy(() => import('./pages/Account'))
 const LiveView = lazy(() => import('./pages/LiveView'))
@@ -110,6 +111,7 @@ export default function App() {
             <Route path="/contact" element={<Contact />} />
             <Route path="/terms" element={<TermsOfUse />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/delete-account" element={<DeleteAccount />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogArticle />} />
             <Route path="*" element={<ComingSoon feature="This page" />} />
