@@ -160,7 +160,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ]),
         ),
-        const Icon(Icons.star_rounded, color: Colors.white54, size: 52),
+        Image.asset('assets/images/logo_hiring.png', width: 60, height: 60),
       ]),
     );
   }

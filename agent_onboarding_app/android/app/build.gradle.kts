@@ -58,14 +58,9 @@ android {
         }
     }
 
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "armeabi-v7a", "x86_64")
-            isUniversalApk = false
-        }
-    }
+    // No ABI splits: an app bundle is split per ABI by Play, and AGP 8.11+
+    // rejects splits alongside Flutter's ndk abiFilters. For per-ABI APKs use
+    // `flutter build apk --split-per-abi`.
 }
 
 flutter {

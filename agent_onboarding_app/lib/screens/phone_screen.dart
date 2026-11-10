@@ -47,14 +47,7 @@ class _PhoneScreenState extends State<PhoneScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 40),
-              Container(
-                width: 90, height: 90,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryLight]),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: const Icon(Icons.star_rounded, color: Colors.white, size: 48),
-              ),
+              Image.asset('assets/images/logo_hiring.png', width: 132, height: 132),
               const SizedBox(height: 24),
               const Text('Grahvarta', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primary)),
               const SizedBox(height: 6),

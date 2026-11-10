@@ -107,7 +107,7 @@ class _BirthChartScreenState extends State<BirthChartScreen> {
         child: SizedBox(
           width: size, height: size,
           child: CustomPaint(
-            painter: _NorthIndianKundaliPainter(houses: _houses, accentColor: context.clr.accent),
+            painter: _NorthIndianKundaliPainter(houses: _houses, accentColor: context.clr.accent, textColor: context.clr.txtPrimary),
           ),
         ),
       ),
@@ -198,8 +198,9 @@ class _BirthChartScreenState extends State<BirthChartScreen> {
 class _NorthIndianKundaliPainter extends CustomPainter {
   final List<List<String>> houses;
   final Color accentColor;
+  final Color textColor;
 
-  _NorthIndianKundaliPainter({required this.houses, required this.accentColor});
+  _NorthIndianKundaliPainter({required this.houses, required this.accentColor, required this.textColor});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -248,7 +249,7 @@ class _NorthIndianKundaliPainter extends CustomPainter {
     ];
 
     final houseNumStyle = TextStyle(color: accentColor.withValues(alpha: 0.4), fontSize: w * 0.03, fontWeight: FontWeight.bold);
-    final planetStyle = TextStyle(color: Colors.white, fontSize: w * 0.035, fontWeight: FontWeight.w600);
+    final planetStyle = TextStyle(color: textColor, fontSize: w * 0.035, fontWeight: FontWeight.w600);
 
     for (int i = 0; i < 12; i++) {
       final center = centers[i];
@@ -269,5 +270,5 @@ class _NorthIndianKundaliPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _NorthIndianKundaliPainter old) => old.houses != houses;
+  bool shouldRepaint(covariant _NorthIndianKundaliPainter old) => old.houses != houses || old.textColor != textColor;
 }
