@@ -36,7 +36,7 @@ const columns = [
 
 export default function Footer() {
   return (
-    <footer className="bg-surface border-t border-border mt-16">
+    <footer className="bg-surface border-t border-border">
       <div className="container-page py-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
         <div>
           <Link to="/" className="flex items-center gap-2 mb-3">
