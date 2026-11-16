@@ -7,6 +7,8 @@ router.post('/upload-photo', (req, res, next) => {
     next();
   });
 }, ctrl.uploadPhoto);
+router.post('/send-otp', ctrl.sendEmailOtp);
+router.post('/verify-otp', ctrl.verifyEmailOtp);
 router.post('/apply', ctrl.submitApplication);
 router.get('/status', ctrl.getStatus);
 

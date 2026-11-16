@@ -59,6 +59,9 @@ exports.register = async (req, res) => {
     const user = result.rows[0];
     const token = generateToken(user.id);
 
+    // Testing: credit the new user's wallet (see walletController.grantTestCredit)
+    await require('./walletController').grantTestCredit(user.id);
+
     res.status(201).json({ success: true, data: { user, token } });
   } catch (err) {
     console.error('Register error:', err);
@@ -79,6 +82,14 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    if (user.is_banned) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account has been locked. Please contact support@grahvarta.com for assistance.',
+        code: 'ACCOUNT_LOCKED',
+      });
     }
 
     // Role-based access control

@@ -334,6 +334,49 @@ class ApiService {
     await _handle(r);
   }
 
+  /// Master switch and/or per-channel switches. Only non-null values are sent.
+  static Future<Map<String, dynamic>> updateChannelAvailability({bool? online, bool? chat, bool? call, bool? video}) async {
+    final r = await http.patch(
+      Uri.parse('$baseUrl/astrologers/availability'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({
+        if (online != null) 'is_available': online,
+        if (chat != null) 'is_chat_available': chat,
+        if (call != null) 'is_call_available': call,
+        if (video != null) 'is_video_available': video,
+      }),
+    );
+    return Map<String, dynamic>.from((await _handle(r))['data'] ?? {});
+  }
+
+  // ── Blocked users ─────────────────────────────────────────────
+  static Future<List<Map<String, dynamic>>> getBlockedUsers() async {
+    final r = await http.get(Uri.parse('$baseUrl/astrologers/me/blocked-users'), headers: await _headers(auth: true));
+    return List<Map<String, dynamic>>.from(((await _handle(r))['data'] as List? ?? []).map((e) => Map<String, dynamic>.from(e)));
+  }
+
+  /// Returns ids of consultations with this user that are still active (to end them).
+  static Future<List<String>> blockUser(String userId, {String? reason}) async {
+    final r = await http.post(
+      Uri.parse('$baseUrl/astrologers/me/blocked-users/$userId'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({if (reason != null && reason.isNotEmpty) 'reason': reason}),
+    );
+    final body = await _handle(r);
+    return List<String>.from((body['active_consultation_ids'] as List? ?? []).map((e) => e.toString()));
+  }
+
+  static Future<void> unblockUser(String userId) async {
+    final r = await http.delete(Uri.parse('$baseUrl/astrologers/me/blocked-users/$userId'), headers: await _headers(auth: true));
+    await _handle(r);
+  }
+
+  // ── Call transcript ───────────────────────────────────────────
+  static Future<Map<String, dynamic>> getConsultationTranscript(String consultationId) async {
+    final r = await http.get(Uri.parse('$baseUrl/astrologers/consultations/$consultationId/transcript'), headers: await _headers(auth: true));
+    return Map<String, dynamic>.from((await _handle(r))['data'] ?? {});
+  }
+
   static Future<List<dynamic>> getAstrologerTransactions() async {
     final r = await http.get(Uri.parse('$baseUrl/astrologers/me/transactions'), headers: await _headers(auth: true));
     return (await _handle(r))['data'] as List;

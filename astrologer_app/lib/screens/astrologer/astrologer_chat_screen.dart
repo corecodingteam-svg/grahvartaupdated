@@ -6,6 +6,8 @@ import 'package:shimmer/shimmer.dart';
 import '../../cubits/chat_cubit.dart';
 import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/block_user.dart';
+import '../../utils/contact_filter.dart';
 
 class AstrologerChatScreen extends StatefulWidget {
   final String consultationId;
@@ -38,6 +40,7 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
     SocketService.instance.off('billing_tick');
     SocketService.instance.off('peer_typing');
     SocketService.instance.off('consultation_ended');
+    SocketService.instance.off('message_blocked');
     _ctrl.dispose();
     _scroll.dispose();
     _cubit.close();
@@ -63,6 +66,10 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
     socket.on('peer_typing', (data) {
       if (!mounted) return;
       _cubit.setPeerTyping((data as Map)['is_typing'] == true);
+    });
+    socket.on('message_blocked', (data) {
+      if (!mounted) return;
+      _showRuleSnack((data is Map ? data['message'] : null) as String? ?? 'Message not sent.');
     });
     socket.on('consultation_ended', (data) {
       if (!mounted) return;
@@ -116,9 +123,34 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
     });
   }
 
+  void _showRuleSnack(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message), backgroundColor: context.clr.error, duration: const Duration(seconds: 4)));
+  }
+
+  Future<void> _blockUser() async {
+    final userId = widget.userId;
+    if (userId == null) return;
+    final blocked = await confirmAndBlockUser(context, userId: userId, userName: widget.userName);
+    if (blocked && mounted && !_cubit.state.isEnded) {
+      _cubit.setEnded();
+      SocketService.instance.astrologerEndConsultation(widget.consultationId);
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+      });
+    }
+  }
+
   void _sendMessage() {
     final text = _ctrl.text.trim();
     if (text.isEmpty || _cubit.state.isEnded) return;
+    // Phone numbers / email addresses may not be shared in chat
+    final detected = ContactFilter.detect(text);
+    if (detected.isNotEmpty) {
+      _showRuleSnack(ContactFilter.blockedMessage(detected));
+      return;
+    }
     _cubit.sendTextMessage(text);
     _ctrl.clear();
     _scrollBottom();
@@ -241,6 +273,22 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
                   icon: Icon(Icons.call_end, color: context.clr.error, size: 18),
                   label: Text('End', style: TextStyle(color: context.clr.error)),
                 ),
+                if (widget.userId != null)
+                  PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert, color: context.clr.txtPrimary),
+                    color: context.clr.card,
+                    onSelected: (v) { if (v == 'block') _blockUser(); },
+                    itemBuilder: (_) => [
+                      PopupMenuItem(
+                        value: 'block',
+                        child: Row(children: [
+                          Icon(Icons.block, color: context.clr.error, size: 18),
+                          const SizedBox(width: 10),
+                          Text('Block user', style: TextStyle(color: context.clr.error)),
+                        ]),
+                      ),
+                    ],
+                  ),
               ],
             ),
             body: Column(

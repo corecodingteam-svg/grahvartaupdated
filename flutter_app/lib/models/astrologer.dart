@@ -21,6 +21,10 @@ class Astrologer {
   final bool isVerified;
   final bool isAvailable;
   final int queueCount;
+  // Per-channel availability set by the astrologer (chat / voice call / video call)
+  final bool isChatAvailable;
+  final bool isCallAvailable;
+  final bool isVideoAvailable;
 
   Astrologer({
     required this.id,
@@ -42,6 +46,9 @@ class Astrologer {
     this.isVerified = false,
     this.isAvailable = true,
     this.queueCount = 0,
+    this.isChatAvailable = true,
+    this.isCallAvailable = true,
+    this.isVideoAvailable = true,
   });
 
   factory Astrologer.fromJson(Map<String, dynamic> json) {
@@ -71,8 +78,34 @@ class Astrologer {
       isVerified: json['is_verified'] ?? false,
       isAvailable: json['is_available'] ?? true,
       queueCount: json['queue_count'] ?? 0,
+      isChatAvailable: json['is_chat_available'] ?? true,
+      isCallAvailable: json['is_call_available'] ?? true,
+      isVideoAvailable: json['is_video_available'] ?? true,
     );
   }
+
+  /// Online and accepting this kind of consultation ('chat' | 'voice' | 'video').
+  bool canConsult(String type) {
+    if (!isOnline || !isAvailable) return false;
+    if (type == 'chat') return isChatAvailable;
+    if (type == 'voice') return isCallAvailable;
+    return isVideoAvailable;
+  }
+
+  /// Apply a live presence/availability socket event
+  /// (astrologer_online / astrologer_offline / astrologer_availability).
+  Astrologer withStatus(Map<String, dynamic> e, {bool? forceOnline}) => Astrologer(
+    id: id, userId: userId, displayName: displayName, bio: bio, avatarUrl: avatarUrl,
+    experienceYears: experienceYears, languages: languages, specializations: specializations,
+    expertiseAreas: expertiseAreas, perMinuteRateChat: perMinuteRateChat, perMinuteRateCall: perMinuteRateCall,
+    perMinuteRateVideo: perMinuteRateVideo, totalConsultations: totalConsultations, rating: rating,
+    reviewCount: reviewCount, isVerified: isVerified, queueCount: queueCount,
+    isOnline: forceOnline ?? (e['is_online'] as bool? ?? isOnline),
+    isAvailable: e['is_available'] as bool? ?? isAvailable,
+    isChatAvailable: e['is_chat_available'] as bool? ?? isChatAvailable,
+    isCallAvailable: e['is_call_available'] as bool? ?? isCallAvailable,
+    isVideoAvailable: e['is_video_available'] as bool? ?? isVideoAvailable,
+  );
 
   String get statusText {
     if (!isAvailable) return 'Busy';

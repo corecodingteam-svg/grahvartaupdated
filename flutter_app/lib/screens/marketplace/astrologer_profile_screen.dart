@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import '../../models/astrologer.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
 import '../consultation/chat_screen.dart';
 import '../consultation/call_screen.dart';
@@ -29,6 +30,29 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
   bool _loadingReviews = true;
   int _selectedTab = 0;
 
+  // Live copy — presence and chat/call/video availability update in real time
+  late Astrologer _astro = widget.astrologer;
+
+  void _onPresence(dynamic data, {bool? online}) {
+    if (!mounted || data is! Map || data['astrologer_id'] != _astro.id) return;
+    setState(() => _astro = _astro.withStatus(Map<String, dynamic>.from(data), forceOnline: data['is_online'] == null ? online : null));
+  }
+  late final Function(dynamic) _onOnline = (d) => _onPresence(d, online: true);
+  late final Function(dynamic) _onOffline = (d) => _onPresence(d, online: false);
+  late final Function(dynamic) _onAvailability = (d) => _onPresence(d);
+
+  void _listenPresence() {
+    final socket = SocketService.instance;
+    socket.on('astrologer_online', _onOnline);
+    socket.on('astrologer_offline', _onOffline);
+    socket.on('astrologer_availability', _onAvailability);
+    socket.connect(); // no-op when already connected; needed for live status
+    // Fresh snapshot in case the list we came from is stale
+    ApiService.getAstrologer(_astro.id).then((a) {
+      if (mounted) setState(() => _astro = a);
+    }).catchError((_) {});
+  }
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +70,7 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
     Future.delayed(const Duration(milliseconds: 300), () => _contentController.forward());
 
     _loadReviews();
+    _listenPresence();
 
     if (widget.startType != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _startConsultation(widget.startType!));
@@ -54,6 +79,10 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
 
   @override
   void dispose() {
+    final socket = SocketService.instance;
+    socket.offHandler('astrologer_online', _onOnline);
+    socket.offHandler('astrologer_offline', _onOffline);
+    socket.offHandler('astrologer_availability', _onAvailability);
     _tabController.dispose();
     _heroController.dispose();
     _contentController.dispose();
@@ -62,7 +91,7 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
 
   Future<void> _loadReviews() async {
     try {
-      final data = await ApiService.getAstrologerReviews(widget.astrologer.id);
+      final data = await ApiService.getAstrologerReviews(_astro.id);
       if (mounted) setState(() { _reviews = data; _loadingReviews = false; });
     } catch (_) {
       if (mounted) setState(() { _reviews = _demoReviews(); _loadingReviews = false; });
@@ -78,11 +107,22 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
   Future<void> _startConsultation(String type) async {
     HapticFeedback.mediumImpact();
 
+    if (!_astro.canConsult(type)) {
+      final label = type == 'chat' ? 'chat' : type == 'voice' ? 'voice calls' : 'video calls';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(!_astro.isOnline || !_astro.isAvailable
+            ? '${_astro.displayName} is offline right now.'
+            : '${_astro.displayName} is not taking $label right now.'),
+        backgroundColor: context.clr.error,
+      ));
+      return;
+    }
+
     // Check wallet balance before starting
     try {
       final walletData = await ApiService.getWallet();
       final balance = walletData.balance;
-      final a = widget.astrologer;
+      final a = _astro;
       final rate = type == 'chat'
           ? a.perMinuteRateChat
           : type == 'voice'
@@ -101,9 +141,9 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
 
     if (!mounted) return;
     if (type == 'chat') {
-      Navigator.push(context, _fadeRoute(ChatScreen(astrologer: widget.astrologer)));
+      Navigator.push(context, _fadeRoute(ChatScreen(astrologer: _astro)));
     } else {
-      Navigator.push(context, _fadeRoute(CallScreen(astrologer: widget.astrologer, callType: type)));
+      Navigator.push(context, _fadeRoute(CallScreen(astrologer: _astro, callType: type)));
     }
   }
 
@@ -151,7 +191,7 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
 
   @override
   Widget build(BuildContext context) {
-    final a = widget.astrologer;
+    final a = _astro;
     final statusBarH = MediaQuery.of(context).padding.top;
 
     return Scaffold(
@@ -499,42 +539,42 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
             // Call buttons
             _ConsultIconBtn(
               icon: Icons.phone_rounded,
-              color: context.clr.success,
-              tooltip: '₹${a.perMinuteRateCall.toInt()}/min',
+              color: a.canConsult('voice') ? context.clr.success : context.clr.txtMuted,
+              tooltip: a.canConsult('voice') ? '₹${a.perMinuteRateCall.toInt()}/min' : 'Voice call unavailable',
               onTap: () => _startConsultation('voice'),
             ),
             const SizedBox(width: 10),
             _ConsultIconBtn(
               icon: Icons.videocam_rounded,
-              color: const Color(0xFF2196F3),
-              tooltip: '₹${a.perMinuteRateVideo.toInt()}/min',
+              color: a.canConsult('video') ? const Color(0xFF2196F3) : context.clr.txtMuted,
+              tooltip: a.canConsult('video') ? '₹${a.perMinuteRateVideo.toInt()}/min' : 'Video call unavailable',
               onTap: () => _startConsultation('video'),
             ),
             const SizedBox(width: 12),
             // Chat button
             Expanded(child: GestureDetector(
-              onTap: a.isOnline ? () => _startConsultation('chat') : null,
+              onTap: a.canConsult('chat') ? () => _startConsultation('chat') : null,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 height: 50,
                 decoration: BoxDecoration(
-                  gradient: a.isOnline
+                  gradient: a.canConsult('chat')
                       ? const LinearGradient(colors: [Color(0xFF027DFD), Color(0xFF0553B1)])
                       : null,
-                  color: a.isOnline ? null : context.clr.surface,
+                  color: a.canConsult('chat') ? null : context.clr.surface,
                   borderRadius: BorderRadius.circular(14),
-                  border: a.isOnline ? null : Border.all(color: context.clr.border),
+                  border: a.canConsult('chat') ? null : Border.all(color: context.clr.border),
                 ),
                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   Icon(Icons.chat_bubble_rounded, size: 18,
-                    color: a.isOnline ? Colors.white : context.clr.txtMuted),
+                    color: a.canConsult('chat') ? Colors.white : context.clr.txtMuted),
                   const SizedBox(width: 8),
                   Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(a.isOnline ? 'Chat Now' : 'Offline',
-                      style: TextStyle(color: a.isOnline ? Colors.white : context.clr.txtMuted,
+                    Text(a.canConsult('chat') ? 'Chat Now' : (a.isOnline && a.isAvailable ? 'Chat Off' : 'Offline'),
+                      style: TextStyle(color: a.canConsult('chat') ? Colors.white : context.clr.txtMuted,
                         fontSize: 14, fontWeight: FontWeight.bold)),
                     Text('₹${a.perMinuteRateChat.toInt()}/min',
-                      style: TextStyle(color: a.isOnline ? Colors.white.withOpacity(0.7) : context.clr.txtMuted,
+                      style: TextStyle(color: a.canConsult('chat') ? Colors.white.withOpacity(0.7) : context.clr.txtMuted,
                         fontSize: 11)),
                   ]),
                 ]),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme.dart';
+import '../api_service.dart';
+import '../device_id.dart';
 import 'registration_screen.dart';
 import 'dashboard_screen.dart';
 
@@ -13,24 +15,47 @@ class PhoneScreen extends StatefulWidget {
 class _PhoneScreenState extends State<PhoneScreen> {
   final _phoneCtrl = TextEditingController();
   String? _error;
+  bool _checking = false;
 
   Future<void> _continue() async {
     final digits = _phoneCtrl.text.trim();
-    if (digits.length != 10 || !RegExp(r'^\d{10}$').hasMatch(digits)) {
+    if (digits.length != 10 || !RegExp(r'^[6-9]\d{9}$').hasMatch(digits)) {
       setState(() => _error = 'Enter a valid 10-digit mobile number');
       return;
     }
     final phone = '+91$digits';
 
-    // If already registered, go to dashboard
+    // If already registered on this phone, go to dashboard
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString('agent_phone');
     if (!mounted) return;
-
     if (saved == phone) {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DashboardScreen(phone: phone)));
-    } else {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => RegistrationScreen(phone: phone)));
+      return;
+    }
+
+    // Otherwise ask the server: an existing application can only be opened from
+    // the device it was registered on (also restores access after a reinstall).
+    setState(() { _checking = true; _error = null; });
+    try {
+      final deviceId = await DeviceId.get();
+      final existing = await ApiService.getApplicationStatus(phone, deviceId: deviceId);
+      if (!mounted) return;
+      if (existing == null) {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => RegistrationScreen(phone: phone)));
+      } else if (existing['device_match'] == false) {
+        setState(() => _error = 'This number was registered from a different device. Please use that device to check your application.');
+      } else {
+        await prefs.setString('agent_phone', phone);
+        await prefs.setString('agent_name', existing['name'] as String? ?? '');
+        await prefs.setString('agent_token', existing['token_no'] as String? ?? '');
+        if (!mounted) return;
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DashboardScreen(phone: phone)));
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _checking = false);
     }
   }
 
@@ -77,8 +102,10 @@ class _PhoneScreenState extends State<PhoneScreen> {
               ],
               const SizedBox(height: 28),
               ElevatedButton(
-                onPressed: _continue,
-                child: const Text('Continue'),
+                onPressed: _checking ? null : _continue,
+                child: _checking
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Continue'),
               ),
             ],
           ),

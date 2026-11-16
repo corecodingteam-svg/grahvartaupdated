@@ -800,10 +800,10 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
       // uid=0 lets Agora auto-assign a unique uid per viewer
       final tokenData = await ApiService.getAgoraToken(widget.session.id, uid: 0);
       final token = tokenData['data']?['token'] ?? tokenData['token'];
-      const appId = 'e2e9d562aa754dcca16a5219e557b133';
+      final appId = (tokenData['app_id'] ?? tokenData['data']?['app_id'] ?? 'cfc5ddec9cdd48f09a301aba96991a25') as String;
 
       _engine = createAgoraRtcEngine();
-      await _engine!.initialize(const RtcEngineContext(appId: appId));
+      await _engine!.initialize(RtcEngineContext(appId: appId));
       await _engine!.enableVideo();
 
       _engine!.registerEventHandler(RtcEngineEventHandler(

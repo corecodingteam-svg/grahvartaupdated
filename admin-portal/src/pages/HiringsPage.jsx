@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, X, Phone, Mail, Smartphone, Globe, Calendar, Users, Eye, EyeOff, Copy } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Phone, Mail, Smartphone, Globe, Calendar, Users, Eye, EyeOff, Copy, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import api from '../services/api';
 import PageHeader from '../components/PageHeader';
@@ -30,7 +30,128 @@ const STATUS_COLORS = {
 
 function statusBadge(s) { return STATUS_COLORS[s] || 'badge-gray'; }
 
+const LANGUAGE_OPTIONS = [
+  'Assamese','Bengali','Bodo','Dogri','English','Gujarati','Hindi','Kannada','Kashmiri','Konkani','Maithili',
+  'Malayalam','Manipuri','Marathi','Nepali','Odia','Punjabi','Sanskrit','Santali','Sindhi','Tamil','Telugu','Urdu',
+];
+const SKILL_OPTIONS = [
+  'Signature Reading','Tarot','Vedic','KP','Numerology','Lal Kitab','Psychic','Palmistry','Cartomancy','Prashana',
+  'Loshu Grid','Nadi','Face Reading','Horary','Life Coach','Western','Gemology','Vastu',
+];
+
+function ChipPicker({ options, value, onChange }) {
+  const extra = value.filter(v => !options.includes(v)); // keep anything not in the preset list
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {[...options, ...extra].map(o => {
+        const on = value.includes(o);
+        return (
+          <button
+            type="button"
+            key={o}
+            onClick={() => onChange(on ? value.filter(v => v !== o) : [...value, o])}
+            className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${on ? 'bg-orange/15 border-orange text-orange' : 'bg-surface-light border-border text-text-secondary hover:text-white'}`}
+          >
+            {o}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function EditProfileForm({ app, onCancel, onSaved }) {
+  const [f, setF] = useState({
+    name: app.name || '',
+    phone: app.phone || '',
+    email: app.email || '',
+    dob: app.dob ? format(new Date(app.dob), 'yyyy-MM-dd') : '',
+    gender: app.gender || '',
+    phone_type: app.phone_type || '',
+    languages: Array.isArray(app.languages) ? app.languages : [],
+    skills: Array.isArray(app.skills) ? app.skills : [],
+    works_online: !!app.works_online,
+    online_platforms: app.online_platforms || '',
+    hours_available: app.hours_available ?? 4,
+    about_me: app.about_me || '',
+    profile_picture_url: app.profile_picture_url || '',
+  });
+  const [sync, setSync] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
+  const inputCls = 'w-full bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-orange/50';
+
+  const save = async () => {
+    if (!f.name.trim()) return toast.error('Name is required');
+    if (f.works_online && !f.online_platforms.trim()) return toast.error('Enter the online platform names');
+    setSaving(true);
+    try {
+      const res = await api.put(`/hirings/${app.id}/profile`, {
+        ...f,
+        dob: f.dob || null,
+        online_platforms: f.works_online ? f.online_platforms.trim() : null,
+        hours_available: parseInt(f.hours_available) || 0,
+        sync_astrologer: app.converted_to_astrologer ? sync : undefined,
+      });
+      if (res.data.message === 'No changes') toast('No changes to save');
+      else toast.success(res.data.astrologer_synced ? 'Profile updated (astrologer profile synced)' : 'Profile updated');
+      onSaved();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const label = (t) => <label className="block text-xs text-text-muted mb-1">{t}</label>;
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div>{label('Full name')}<input className={inputCls} value={f.name} onChange={e => set('name', e.target.value)} /></div>
+        <div>{label('Mobile')}<input className={inputCls} value={f.phone} onChange={e => set('phone', e.target.value)} /></div>
+        <div className="col-span-2">{label('Email')}<input type="email" className={inputCls} value={f.email} onChange={e => set('email', e.target.value)} /></div>
+        <div>{label('Date of birth')}<input type="date" className={inputCls} value={f.dob} onChange={e => set('dob', e.target.value)} /></div>
+        <div>{label('Gender')}
+          <select className={inputCls} value={f.gender} onChange={e => set('gender', e.target.value)}>
+            <option value="">—</option><option>Male</option><option>Female</option><option>Other</option>
+          </select>
+        </div>
+        <div>{label('Phone type')}
+          <select className={inputCls} value={f.phone_type} onChange={e => set('phone_type', e.target.value)}>
+            <option value="">—</option><option value="android">Android</option><option value="ios">iOS</option>
+          </select>
+        </div>
+        <div>{label('Hours per day')}<input type="number" min="1" max="24" className={inputCls} value={f.hours_available} onChange={e => set('hours_available', e.target.value)} /></div>
+      </div>
+      <div>{label('Profile picture path / URL')}<input className={inputCls} value={f.profile_picture_url} onChange={e => set('profile_picture_url', e.target.value)} /></div>
+      <div>{label('Languages')}<ChipPicker options={LANGUAGE_OPTIONS} value={f.languages} onChange={v => set('languages', v)} /></div>
+      <div>{label('Skills')}<ChipPicker options={SKILL_OPTIONS} value={f.skills} onChange={v => set('skills', v)} /></div>
+      <div className="space-y-2">
+        <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
+          <input type="checkbox" className="accent-orange" checked={f.works_online} onChange={e => set('works_online', e.target.checked)} />
+          Works on other online platforms
+        </label>
+        {f.works_online && <input className={inputCls} placeholder="e.g. AstroTalk, AstroSage" value={f.online_platforms} onChange={e => set('online_platforms', e.target.value)} />}
+      </div>
+      <div>{label('About me')}<textarea rows={3} className={`${inputCls} resize-none`} value={f.about_me} onChange={e => set('about_me', e.target.value)} /></div>
+      {app.converted_to_astrologer && (
+        <label className="flex items-start gap-2 text-sm text-text-secondary cursor-pointer bg-green-900/20 border border-green-700/30 rounded-xl p-3">
+          <input type="checkbox" className="accent-orange mt-0.5" checked={sync} onChange={e => setSync(e.target.checked)} />
+          <span>Also update the live astrologer profile (name, photo, about, languages, skills)</span>
+        </label>
+      )}
+      <div className="flex gap-3">
+        <button onClick={onCancel} className="flex-1 py-2.5 rounded-xl border border-border text-text-secondary hover:text-white text-sm">Cancel</button>
+        <button onClick={save} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-orange text-white text-sm font-medium hover:bg-orange/90 disabled:opacity-40">
+          {saving ? 'Saving…' : 'Save profile'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function DetailPanel({ app, onClose, onUpdated }) {
+  const [editing, setEditing] = useState(false);
   const [notes, setNotes] = useState(app.admin_notes || '');
   const [newStatus, setNewStatus] = useState(app.status);
   const [saving, setSaving] = useState(false);
@@ -110,11 +231,23 @@ function DetailPanel({ app, onClose, onUpdated }) {
             <h2 className="font-semibold text-white text-lg">Application Details</h2>
             {app.token_no && <p className="text-xs text-text-muted mt-0.5">Token: <span className="text-orange font-mono">{app.token_no}</span></p>}
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-light text-text-muted hover:text-white transition-colors">
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            {!editing && (
+              <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange/15 text-orange text-xs font-medium hover:bg-orange/25 transition-colors">
+                <Pencil size={13} /> Edit profile
+              </button>
+            )}
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-light text-text-muted hover:text-white transition-colors">
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
+        {editing ? (
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            <EditProfileForm app={app} onCancel={() => setEditing(false)} onSaved={() => { onUpdated(); onClose(); }} />
+          </div>
+        ) : (<>
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {/* Photo + name */}
           <div className="flex items-center gap-4">
@@ -176,6 +309,10 @@ function DetailPanel({ app, onClose, onUpdated }) {
             <Row icon={<Calendar size={14} />} label="DOB" value={app.dob ? format(new Date(app.dob), 'dd MMM yyyy') : '—'} />
             <Row icon={<Users size={14} />} label="Gender" value={app.gender || '—'} capitalize />
             <Row icon={<Globe size={14} />} label="Works online" value={app.works_online ? 'Yes' : 'No'} />
+            {app.works_online && <Row icon={<Globe size={14} />} label="Platforms" value={app.online_platforms || '—'} />}
+            <Row icon={<Calendar size={14} />} label="Hours / day" value={app.hours_available ?? '—'} />
+            <Row icon={<Mail size={14} />} label="Email verified" value={app.email_verified_at ? format(new Date(app.email_verified_at), 'dd MMM yyyy, HH:mm') : 'No'} />
+            {app.device_platform && <Row icon={<Smartphone size={14} />} label="Registered on" value={app.device_platform} capitalize />}
           </div>
 
           {/* Languages */}
@@ -293,6 +430,7 @@ function DetailPanel({ app, onClose, onUpdated }) {
             {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
+        </>)}
       </div>
     </div>
   );

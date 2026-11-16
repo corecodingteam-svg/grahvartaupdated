@@ -12,7 +12,8 @@ router.get('/token', authenticate, (req, res) => {
   if (APP_CERT) {
     try {
       const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
-      const expiry = Math.floor(Date.now() / 1000) + 3600;
+      // 4h: a token expiring mid-session would drop long calls / live sessions
+      const expiry = Math.floor(Date.now() / 1000) + 4 * 3600;
       token = RtcTokenBuilder.buildTokenWithUid(APP_ID, APP_CERT, channel, parseInt(uid), RtcRole.PUBLISHER, expiry);
     } catch (e) {
       console.error('Agora token error:', e.message);

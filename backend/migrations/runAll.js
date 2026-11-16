@@ -28,7 +28,20 @@ const migrations = [
   '021_sub_admins.sql',
   '022_hiring_temp_password.sql',
   '023_second_admin.sql',
+  '024_hiring_otp_device.sql',
+  '025_admin_audit_logs.sql',
+  '026_moderation.sql',
+  '027_astrologer_blocks.sql',
+  '028_astrologer_channel_availability.sql',
+  '029_consultation_transcripts.sql',
+  '030_test_wallet_credit.sql',
+  '031_recharge_offers_dedupe.sql',
+  '032_wallet_orders_reconcile.sql',
 ];
+
+// Migrations that existed before the _migrations tracking table was introduced.
+// Only these may be pre-marked as applied on an existing database.
+const PRE_TRACKING = migrations.slice(0, migrations.indexOf('023_second_admin.sql'));
 
 async function runAll() {
   const client = await pool.connect();
@@ -56,7 +69,7 @@ async function runAll() {
         if (parseInt(userCount.rows[0].count) > 0) {
           // Existing deployment — mark all migrations up to 022 as already applied
           console.log('Existing deployment detected — pre-marking migrations 001-022 as applied...');
-          const alreadyApplied = migrations.filter(m => m !== '023_second_admin.sql');
+          const alreadyApplied = PRE_TRACKING;
           for (const m of alreadyApplied) {
             await client.query(
               'INSERT INTO _migrations (name) VALUES ($1) ON CONFLICT DO NOTHING',

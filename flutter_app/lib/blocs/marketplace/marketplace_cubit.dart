@@ -1,9 +1,44 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 import 'marketplace_state.dart';
 
 class MarketplaceCubit extends Cubit<MarketplaceState> {
-  MarketplaceCubit() : super(const MarketplaceInitial());
+  MarketplaceCubit() : super(const MarketplaceInitial()) {
+    // Live presence: astrologers going online/offline or switching
+    // chat / call / video on or off update the list without a reload.
+    final socket = SocketService.instance;
+    socket.on('astrologer_online', _onOnline);
+    socket.on('astrologer_offline', _onOffline);
+    socket.on('astrologer_availability', _onAvailability);
+    socket.connect();
+  }
+
+  late final Function(dynamic) _onOnline = (d) => _applyPresence(d, true);
+  late final Function(dynamic) _onOffline = (d) => _applyPresence(d, false);
+  late final Function(dynamic) _onAvailability = (d) => _applyPresence(d, null);
+
+  void _applyPresence(dynamic data, bool? online) {
+    final current = state;
+    if (isClosed || current is! MarketplaceLoaded || data is! Map) return;
+    final id = data['astrologer_id'];
+    if (!current.astrologers.any((a) => a.id == id)) return;
+    final event = Map<String, dynamic>.from(data);
+    var updated = current.astrologers
+        .map((a) => a.id == id ? a.withStatus(event, forceOnline: event['is_online'] == null ? online : null) : a)
+        .toList();
+    if (current.onlineOnly) updated = updated.where((a) => a.isOnline).toList();
+    emit(current.copyWith(astrologers: updated));
+  }
+
+  @override
+  Future<void> close() {
+    final socket = SocketService.instance;
+    socket.offHandler('astrologer_online', _onOnline);
+    socket.offHandler('astrologer_offline', _onOffline);
+    socket.offHandler('astrologer_availability', _onAvailability);
+    return super.close();
+  }
 
   Future<void> load() async {
     final current = state;

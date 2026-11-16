@@ -2,6 +2,11 @@ const router = require('express').Router();
 const { body } = require('express-validator');
 const { authenticateAdmin, requirePermission } = require('../middleware/adminAuth');
 const ctrl = require('../controllers/adminController');
+const moderation = require('../controllers/moderationController');
+const { auditAdminActions } = require('../middleware/auditLog');
+
+// Every state-changing admin request (including login attempts) is written to admin_audit_logs
+router.use(auditAdminActions);
 
 // Auth (no middleware)
 router.post('/login', [
@@ -34,6 +39,7 @@ router.get('/astrologers', ctrl.listAstrologers);
 router.post('/astrologers/:id/approve', ctrl.approveAstrologer);
 router.post('/astrologers/:id/reject', ctrl.rejectAstrologer);
 router.put('/astrologers/:id/rates', ctrl.setAstrologerRates);
+router.put('/astrologers/:id', ctrl.updateAstrologerProfile);
 router.post('/astrologers/:id/toggle-online', ctrl.toggleAstrologerOnline);
 router.post('/astrologers/:id/ban', ctrl.banAstrologer);
 router.post('/astrologers/:id/unban', ctrl.unbanAstrologer);
@@ -83,6 +89,7 @@ router.post('/notifications/segment', [
 const hiringCtrl = require('../controllers/hiringController');
 router.get('/hirings', hiringCtrl.listApplications);
 router.patch('/hirings/:id', hiringCtrl.updateStatus);
+router.put('/hirings/:id/profile', hiringCtrl.updateProfile);
 router.post('/hirings/:id/activate-as-astrologer', hiringCtrl.activateAsAstrologer);
 router.post('/hirings/:id/resend-email', hiringCtrl.resendWelcomeEmail);
 router.post('/hirings/:id/reset-password', hiringCtrl.resetPassword);
@@ -93,6 +100,19 @@ router.get('/recharge-offers', walletCtrl.adminListOffers);
 router.post('/recharge-offers', walletCtrl.adminCreateOffer);
 router.put('/recharge-offers/:id', walletCtrl.adminUpdateOffer);
 router.delete('/recharge-offers/:id', walletCtrl.adminDeleteOffer);
+
+// Rule violators: astrologers / users who tried to share contact details
+router.get('/moderation/violators', moderation.listViolators);
+router.get('/moderation/:userId', moderation.getSubjectHistory);
+router.post('/moderation/:userId/warn', moderation.warn);
+router.post('/moderation/:userId/hold', moderation.hold);
+router.post('/moderation/:userId/release', moderation.release);
+router.post('/moderation/:userId/lock', moderation.lock);
+router.post('/moderation/:userId/unlock', moderation.unlock);
+
+// Audit log (superadmin only)
+router.get('/audit-logs', requireSuperAdmin, ctrl.listAuditLogs);
+router.get('/audit-logs/filters', requireSuperAdmin, ctrl.getAuditLogFilters);
 
 // Sub-admin Management (superadmin only)
 router.get('/sub-admins', requireSuperAdmin, ctrl.listSubAdmins);

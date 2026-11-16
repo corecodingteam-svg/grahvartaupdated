@@ -427,7 +427,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 _DrawerItem(icon: Icons.contacts_outlined, label: 'Important Contacts', onTap: () => _showImportantContacts()),
                 _DrawerItem(icon: Icons.mail_outline_rounded, label: 'Write to Us', onTap: () => _showWriteToUs()),
-                _DrawerItem(icon: Icons.person_outline_rounded, label: 'Update Profile', onTap: () => Navigator.pop(context)),
                 _DrawerItem(icon: Icons.help_outline_rounded, label: 'FAQ', onTap: () => _showFaq()),
               ],
             ),

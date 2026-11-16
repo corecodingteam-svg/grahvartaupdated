@@ -6,7 +6,8 @@ import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
 
-const String _agoraAppId = 'e2e9d562aa754dcca16a5219e557b133';
+// Fallback only — the backend's /agora/token response carries the App ID it signed for
+const String _agoraAppId = 'cfc5ddec9cdd48f09a301aba96991a25';
 
 class AstrologerBroadcastScreen extends StatefulWidget {
   final LiveSession session;
@@ -98,7 +99,7 @@ class _AstrologerBroadcastScreenState extends State<AstrologerBroadcastScreen> {
       final token = tokenData['data']?['token'] ?? tokenData['token'];
 
       _engine = createAgoraRtcEngine();
-      await _engine!.initialize(const RtcEngineContext(appId: _agoraAppId));
+      await _engine!.initialize(RtcEngineContext(appId: (tokenData['app_id'] ?? tokenData['data']?['app_id'] ?? _agoraAppId) as String));
 
       // Set broadcaster role
       await _engine!.setClientRole(role: ClientRoleType.clientRoleBroadcaster);

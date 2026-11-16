@@ -991,3 +991,168 @@ exports.deleteSubAdmin = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// ─── Astrologer profile editing ───────────────────────────────────────────────
+
+const ASTRO_FIELDS = {
+  display_name: 'text', bio: 'text', avatar_url: 'text', experience_years: 'int',
+  languages: 'array', specializations: 'array', expertise_areas: 'array',
+  per_minute_rate_chat: 'money', per_minute_rate_call: 'money', per_minute_rate_video: 'money',
+  is_verified: 'bool', is_chat_available: 'bool', is_call_available: 'bool', is_video_available: 'bool',
+};
+const USER_FIELDS = { phone: 'text', email: 'text' };
+
+function normalizeField(kind, v) {
+  if (kind === 'array') {
+    const list = Array.isArray(v) ? v : String(v || '').split(',');
+    return list.map(s => String(s).trim()).filter(Boolean);
+  }
+  if (kind === 'int') return Math.max(0, parseInt(v) || 0);
+  if (kind === 'money') {
+    const n = parseFloat(v);
+    if (!Number.isFinite(n) || n < 0) throw new Error('Rates must be positive numbers');
+    return n;
+  }
+  if (kind === 'bool') return v === true || v === 'true';
+  return v === null ? null : String(v).trim();
+}
+
+const sameValue = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+  || String(a ?? '') === String(b ?? '');
+
+// PUT /admin/astrologers/:id  — edit any astrologer profile field
+exports.updateAstrologerProfile = async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    const { id } = req.params;
+    const cur = await client.query(
+      `SELECT a.*, u.email, u.phone FROM astrologers a JOIN users u ON u.id = a.user_id WHERE a.id = $1`, [id]
+    );
+    if (!cur.rows.length) return res.status(404).json({ success: false, message: 'Astrologer not found' });
+    const before = cur.rows[0];
+
+    const changes = {};
+    const astroSets = []; const astroParams = [];
+    const userSets = []; const userParams = [];
+    try {
+      for (const [field, kind] of Object.entries(ASTRO_FIELDS)) {
+        if (req.body[field] === undefined) continue;
+        const v = normalizeField(kind, req.body[field]);
+        if (field === 'display_name' && !v) throw new Error('Display name cannot be empty');
+        const prev = kind === 'money' ? parseFloat(before[field]) : before[field];
+        if (sameValue(prev, v)) continue;
+        changes[field] = { from: prev, to: v };
+        astroParams.push(v); astroSets.push(`${field} = $${astroParams.length}`);
+      }
+      for (const [field, kind] of Object.entries(USER_FIELDS)) {
+        if (req.body[field] === undefined) continue;
+        let v = normalizeField(kind, req.body[field]);
+        if (field === 'email') {
+          v = (v || '').toLowerCase();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) throw new Error('Invalid email address');
+        }
+        if (sameValue(before[field], v)) continue;
+        changes[field] = { from: before[field], to: v };
+        userParams.push(v); userSets.push(`${field} = $${userParams.length}`);
+      }
+    } catch (e) {
+      return res.status(400).json({ success: false, message: e.message });
+    }
+
+    if (!astroSets.length && !userSets.length) return res.json({ success: true, message: 'No changes', data: before });
+
+    await client.query('BEGIN');
+    if (astroSets.length) {
+      astroParams.push(id);
+      await client.query(`UPDATE astrologers SET ${astroSets.join(', ')}, updated_at = NOW() WHERE id = $${astroParams.length}`, astroParams);
+    }
+    if (userSets.length || changes.display_name || changes.avatar_url) {
+      // keep the login account's name/avatar in step with the public profile
+      if (changes.display_name) { userParams.push(changes.display_name.to); userSets.push(`name = $${userParams.length}`); }
+      if (changes.avatar_url) { userParams.push(changes.avatar_url.to); userSets.push(`avatar_url = $${userParams.length}`); }
+      userParams.push(before.user_id);
+      await client.query(`UPDATE users SET ${userSets.join(', ')}, updated_at = NOW() WHERE id = $${userParams.length}`, userParams);
+    }
+    await client.query('COMMIT');
+
+    const after = await db.query(
+      `SELECT a.*, u.name, u.email, u.phone FROM astrologers a JOIN users u ON u.id = a.user_id WHERE a.id = $1`, [id]
+    );
+    if (['is_chat_available', 'is_call_available', 'is_video_available'].some(k => changes[k])) {
+      const a = after.rows[0];
+      req.io?.emit('astrologer_availability', {
+        astrologer_id: a.id, is_online: a.is_online, is_available: a.is_available,
+        is_chat_available: a.is_chat_available, is_call_available: a.is_call_available, is_video_available: a.is_video_available,
+      });
+    }
+    req.auditChanges = changes;
+    req.auditSummary = `Edited astrologer ${before.display_name}: ${Object.keys(changes).join(', ')}`;
+    res.json({ success: true, data: after.rows[0] });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (err.code === '23505') return res.status(409).json({ success: false, message: 'That email is already used by another account' });
+    console.error('updateAstrologerProfile error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  } finally {
+    client.release();
+  }
+};
+
+// ─── Audit logs ───────────────────────────────────────────────────────────────
+
+// GET /admin/audit-logs?admin_id=&action=&entity_type=&entity_id=&q=&from=&to=&success=&page=&limit=
+exports.listAuditLogs = async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(200, parseInt(req.query.limit) || 50);
+    const where = [];
+    const params = [];
+    const add = (sql, v) => { params.push(v); where.push(sql.split('?').join(`$${params.length}`)); };
+
+    if (req.query.admin_id) add('admin_id = ?', req.query.admin_id);
+    if (req.query.action) add('action = ?', req.query.action);
+    if (req.query.entity_type) add('entity_type = ?', req.query.entity_type);
+    if (req.query.entity_id) add('entity_id = ?', req.query.entity_id);
+    if (req.query.success === 'true' || req.query.success === 'false') add('success = ?', req.query.success === 'true');
+    if (req.query.from) add('created_at >= ?::date', req.query.from);
+    if (req.query.to) add(`created_at < (?::date + INTERVAL '1 day')`, req.query.to);
+    if (req.query.q) {
+      add('(summary ILIKE ? OR admin_name ILIKE ? OR admin_email ILIKE ? OR path ILIKE ? OR entity_id ILIKE ?)', `%${req.query.q}%`);
+    }
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const [rows, count] = await Promise.all([
+      db.query(
+        `SELECT * FROM admin_audit_logs ${whereSql} ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+        [...params, limit, (page - 1) * limit]
+      ),
+      db.query(`SELECT COUNT(*)::int AS n FROM admin_audit_logs ${whereSql}`, params),
+    ]);
+    res.json({ success: true, data: rows.rows, total: count.rows[0].n, page, limit });
+  } catch (err) {
+    console.error('listAuditLogs error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// GET /admin/audit-logs/filters — distinct values for the filter dropdowns
+exports.getAuditLogFilters = async (req, res) => {
+  try {
+    const [actions, entities, admins] = await Promise.all([
+      db.query('SELECT DISTINCT action FROM admin_audit_logs ORDER BY action'),
+      db.query('SELECT DISTINCT entity_type FROM admin_audit_logs WHERE entity_type IS NOT NULL ORDER BY entity_type'),
+      db.query(`SELECT admin_id, MAX(admin_name) AS admin_name, MAX(admin_email) AS admin_email
+                FROM admin_audit_logs WHERE admin_id IS NOT NULL GROUP BY admin_id ORDER BY MAX(admin_name)`),
+    ]);
+    res.json({
+      success: true,
+      data: {
+        actions: actions.rows.map(r => r.action),
+        entity_types: entities.rows.map(r => r.entity_type),
+        admins: admins.rows,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

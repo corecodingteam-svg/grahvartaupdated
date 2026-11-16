@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'blocked_users_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../cubits/own_profile_cubit.dart';
@@ -398,6 +399,14 @@ class _AstrologerOwnProfileViewState extends State<_AstrologerOwnProfileView> {
           title: 'Change Password',
           subtitle: 'Update your account password',
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen(isSettings: true))),
+        ),
+        const SizedBox(height: 4),
+        _buildSettingsTile(
+          context,
+          icon: Icons.block_rounded,
+          title: 'Blocked users',
+          subtitle: 'People who cannot contact you',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BlockedUsersScreen())),
         ),
         const SizedBox(height: 4),
         Row(children: [

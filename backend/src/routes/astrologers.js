@@ -11,6 +11,10 @@ router.get('/me/wallet', authenticate, ctrl.getAstrologerWallet);
 router.get('/me/transactions', authenticate, ctrl.getAstrologerTransactions);
 router.get('/consultations/history', authenticate, ctrl.getConsultationHistory);
 router.get('/consultations/:id/messages', authenticate, ctrl.getConsultationMessages);
+router.get('/consultations/:id/transcript', authenticate, ctrl.getConsultationTranscript);
+router.get('/me/blocked-users', authenticate, ctrl.listBlockedUsers);
+router.post('/me/blocked-users/:userId', authenticate, ctrl.blockUser);
+router.delete('/me/blocked-users/:userId', authenticate, ctrl.unblockUser);
 router.get('/threads', authenticate, ctrl.getChatThreads);
 router.get('/threads/:userId/messages', authenticate, ctrl.getUserThreadMessages);
 

@@ -8,7 +8,7 @@ import { SOCKET_URL, getToken, api } from '../lib/api'
 // optimistic local echo of your own sent chat message (the server doesn't
 // echo live_chat_message back to the sender), same Agora audience-only join
 // using the session's agora_channel.
-const AGORA_APP_ID = 'e2e9d562aa754dcca16a5219e557b133'
+const AGORA_APP_ID = 'cfc5ddec9cdd48f09a301aba96991a25' // fallback; the token response's app_id wins
 
 export function useLiveView({ sessionId, agoraChannel, initialViewerCount = 0 }) {
   const socketRef = useRef(null)
@@ -67,7 +67,7 @@ export function useLiveView({ sessionId, agoraChannel, initialViewerCount = 0 })
         })
 
         await client.setClientRole('audience')
-        await client.join(AGORA_APP_ID, agoraChannel, res.token || null, uid)
+        await client.join(res.app_id || AGORA_APP_ID, agoraChannel, res.token || null, uid)
       } catch {
         // Silent — the chat/tip layer still works even if the video stream
         // can't be reached (e.g. astrologer hasn't started publishing yet).

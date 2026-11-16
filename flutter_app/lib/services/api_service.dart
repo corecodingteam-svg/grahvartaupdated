@@ -208,6 +208,20 @@ class ApiService {
     return WalletData.fromJson((await _handle(r))['data']);
   }
 
+  /// Ask the server to check this user's pending top-ups with Razorpay and
+  /// credit any that were actually paid (e.g. wallet/redirect methods such as
+  /// MobiKwik whose success callback never reached the app).
+  /// Returns the number of orders credited.
+  static Future<int> reconcileWalletTopups({String? orderId}) async {
+    final r = await http.post(
+      Uri.parse('$baseUrl/wallet/add-money/reconcile'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({if (orderId != null) 'order_id': orderId}),
+    );
+    final data = (await _handle(r))['data'];
+    return (data?['credited_orders'] as List?)?.length ?? 0;
+  }
+
   static Future<List<SubscriptionPlan>> getSubscriptionPlans() async {
     final r = await http.get(Uri.parse('$baseUrl/wallet/plans'), headers: await _headers(auth: true));
     return ((await _handle(r))['data'] as List).map((e) => SubscriptionPlan.fromJson(e)).toList();

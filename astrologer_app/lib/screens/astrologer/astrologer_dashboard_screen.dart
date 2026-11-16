@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import 'astrologer_own_profile_screen.dart';
 import 'astrologer_earnings_screen.dart';
+import 'availability_sheet.dart';
 
 class AstrologerDashboardScreen extends StatelessWidget {
   const AstrologerDashboardScreen({super.key});
@@ -63,27 +64,8 @@ class _AstrologerDashboardView extends StatelessWidget {
             actions: [
               if (astrologer != null)
                 GestureDetector(
-                  onTap: state.toggling ? null : () async {
-                    final current = astrologer.isAvailable;
-                    final success = await cubit.toggleAvailability(current);
-                    if (success) {
-                      await auth.refreshAstrologerProfile();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(!current ? 'You are now available' : 'You are now offline'),
-                            backgroundColor: context.clr.success,
-                          ),
-                        );
-                      }
-                    } else {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Failed to update availability'), backgroundColor: context.clr.error),
-                        );
-                      }
-                    }
-                  },
+                  // Opens Online/Offline + separate chat / voice / video switches
+                  onTap: state.toggling ? null : () => showAvailabilitySheet(context),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

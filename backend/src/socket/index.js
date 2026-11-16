@@ -3,22 +3,67 @@ const db = require('../config/database');
 const { BillingEngine } = require('./billingEngine');
 const { sendPushNotification } = require('../controllers/liveController');
 const { saveMessage, insertSessionDivider } = require('../controllers/threadController');
+const { detectContactInfo, blockedMessageText } = require('../utils/contactFilter');
+const transcription = require('../utils/transcription');
 
 const billingEngines = new Map(); // consultationId -> BillingEngine
 const activeRooms = new Map();    // consultationId -> { userId, astrologerId, type }
-const onlineAstrologers = new Map(); // astrologerId -> socketId
 const onlineUsers = new Map();       // userId -> socketId
+const offlineTimers = new Map();     // astrologerId -> pending "go offline" timer
+
+// An astrologer can have several sockets at once (app reconnects, a second
+// device, the web portal). Every astrologer socket joins this room; the
+// astrologer is "connected" while the room is non-empty.
+const astroRoom = (astrologerId) => `astrologer:${astrologerId}`;
+const OFFLINE_GRACE_MS = 8000; // ride out quick reconnects without flickering offline
+
+const isOnHold = (holdUntil) => !!(holdUntil && new Date(holdUntil).getTime() > Date.now());
 
 function initSocket(io) {
+  const isAstrologerConnected = (astrologerId) =>
+    (io.sockets.adapter.rooms.get(astroRoom(astrologerId))?.size || 0) > 0;
+
+  /** Broadcast an astrologer's current presence + per-channel availability. */
+  async function broadcastAstrologerStatus(astrologerId) {
+    const r = await db.query(
+      `SELECT id, is_online, is_available, is_chat_available, is_call_available, is_video_available
+       FROM astrologers WHERE id = $1`,
+      [astrologerId]
+    );
+    if (!r.rows.length) return;
+    const a = r.rows[0];
+    const payload = {
+      astrologer_id: a.id,
+      is_online: a.is_online,
+      is_available: a.is_available,
+      is_chat_available: a.is_chat_available,
+      is_call_available: a.is_call_available,
+      is_video_available: a.is_video_available,
+    };
+    io.emit(a.is_online ? 'astrologer_online' : 'astrologer_offline', payload);
+    io.emit('astrologer_availability', payload);
+  }
+
+  // Server start: nobody is connected yet, so nobody is online. Sockets that
+  // reconnect re-announce themselves via set_role.
+  db.query('UPDATE astrologers SET is_online = FALSE WHERE is_online = TRUE')
+    .catch(err => console.error('[presence] reset failed:', err.message));
+
+  // Lets REST controllers (availability toggle) know whether a socket is live
+  io.isAstrologerConnected = isAstrologerConnected;
+  io.broadcastAstrologerStatus = broadcastAstrologerStatus;
+
   // Auth middleware
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token;
       if (!token) return next(new Error('No token'));
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const result = await db.query('SELECT id, name, sun_sign FROM users WHERE id = $1', [decoded.userId]);
+      const result = await db.query('SELECT id, name, sun_sign, is_banned, hold_until FROM users WHERE id = $1', [decoded.userId]);
       if (!result.rows.length) return next(new Error('User not found'));
-      socket.user = result.rows[0];
+      if (result.rows[0].is_banned) return next(new Error('Account locked'));
+      const { is_banned, hold_until, ...user } = result.rows[0];
+      socket.user = user;
       next();
     } catch {
       next(new Error('Authentication failed'));
@@ -28,20 +73,33 @@ function initSocket(io) {
   io.on('connection', (socket) => {
     const userId = socket.user.id;
     console.log(`User connected: ${socket.user.name} (${socket.id})`);
+    // Per-user room so admin actions (warn / hold / lock) can reach every device
+    socket.join(`user:${userId}`);
 
     // ─── PRESENCE ───────────────────────────────────────────────
     socket.on('set_role', async ({ role }) => {
       socket.role = role;
       console.log(`[set_role] user=${socket.user.name} (${userId}) role=${role} socket=${socket.id}`);
       if (role === 'astrologer') {
-        const result = await db.query('SELECT id FROM astrologers WHERE user_id = $1', [userId]);
+        const result = await db.query(
+          `SELECT a.id, a.is_available, a.is_banned, a.status, u.hold_until
+           FROM astrologers a JOIN users u ON u.id = a.user_id WHERE a.user_id = $1`,
+          [userId]
+        );
         console.log(`[set_role] astrologer DB lookup: found=${result.rows.length} rows`);
         if (result.rows.length) {
-          socket.astrologerId = result.rows[0].id;
-          onlineAstrologers.set(socket.astrologerId, socket.id);
+          const astro = result.rows[0];
+          socket.astrologerId = astro.id;
+          socket.join(astroRoom(astro.id));
+          const pending = offlineTimers.get(astro.id);
+          if (pending) { clearTimeout(pending); offlineTimers.delete(astro.id); }
           console.log(`Astrologer registered: ${socket.user.name} (astrologer_id=${socket.astrologerId}, socket=${socket.id})`);
-          await db.query('UPDATE astrologers SET is_online = true WHERE id = $1', [socket.astrologerId]);
-          io.emit('astrologer_online', { astrologer_id: socket.astrologerId });
+
+          // Connected is not the same as online: the astrologer's own Online/Offline
+          // toggle (is_available), approval, ban and hold all have to allow it.
+          const canBeOnline = astro.is_available && !astro.is_banned && astro.status === 'approved' && !isOnHold(astro.hold_until);
+          await db.query('UPDATE astrologers SET is_online = $1 WHERE id = $2', [canBeOnline, socket.astrologerId]);
+          await broadcastAstrologerStatus(socket.astrologerId);
 
           // Notify astrologer of any pending queued consultations
           const queued = await db.query(
@@ -69,7 +127,6 @@ function initSocket(io) {
     socket.on('request_consultation', async ({ astrologer_id, type }) => {
       try {
         console.log(`[request_consultation] user=${userId} astrologer_id=${astrologer_id} type=${type}`);
-        console.log(`[onlineAstrologers] map size=${onlineAstrologers.size}`, [...onlineAstrologers.entries()]);
 
         // Reuse existing active/queued consultation if one exists
         const existing = await db.query(
@@ -110,10 +167,10 @@ function initSocket(io) {
             socket.emit('consultation_queued', { consultation_id: c.id, position: 1, estimated_wait: 5 });
 
             // Re-notify astrologer in case they missed the original request
-            const astroSocketId = onlineAstrologers.get(c.astrologer_id);
-            console.log(`[re-notify] astrologer_id=${c.astrologer_id} socketId=${astroSocketId || 'NOT FOUND'}`);
-            if (astroSocketId) {
-              io.to(astroSocketId).emit('new_consultation_request', {
+            const astroConnected = isAstrologerConnected(c.astrologer_id);
+            console.log(`[re-notify] astrologer_id=${c.astrologer_id} connected=${astroConnected}`);
+            if (astroConnected) {
+              io.to(astroRoom(c.astrologer_id)).emit('new_consultation_request', {
                 consultation_id: c.id,
                 user: socket.user,
                 type: c.type,
@@ -135,11 +192,31 @@ function initSocket(io) {
         const balance = parseFloat(walletResult.rows[0]?.balance ?? 0);
 
         const rateCol = type === 'chat' ? 'per_minute_rate_chat' : type === 'voice' ? 'per_minute_rate_call' : 'per_minute_rate_video';
-        const astroResult = await db.query(`SELECT id, display_name, ${rateCol} as rate, is_online, is_available, queue_count FROM astrologers WHERE id = $1`, [astrologer_id]);
+        const channelCol = type === 'chat' ? 'is_chat_available' : type === 'voice' ? 'is_call_available' : 'is_video_available';
+        const astroResult = await db.query(
+          `SELECT a.id, a.user_id, a.display_name, a.${rateCol} as rate, a.is_online, a.is_available, a.queue_count,
+                  a.is_banned, a.${channelCol} AS channel_available, u.hold_until AS astro_hold_until,
+                  (SELECT 1 FROM astrologer_blocked_users b WHERE b.astrologer_id = a.id AND b.user_id = $2) AS blocked,
+                  (SELECT hold_until FROM users WHERE id = $2) AS user_hold_until
+           FROM astrologers a JOIN users u ON u.id = a.user_id WHERE a.id = $1`,
+          [astrologer_id, userId]
+        );
 
         if (!astroResult.rows.length) return socket.emit('error', { message: 'Astrologer not found' });
         const astro = astroResult.rows[0];
         const rate = parseFloat(astro.rate);
+
+        const typeLabel = type === 'chat' ? 'chat' : type === 'voice' ? 'voice calls' : 'video calls';
+        let unavailable = null;
+        if (isOnHold(astro.user_hold_until)) unavailable = { reason: 'account_on_hold', message: 'Your account is on hold. You cannot start consultations right now.' };
+        else if (astro.blocked) unavailable = { reason: 'blocked', message: `${astro.display_name} is not available for consultations with you.` };
+        else if (astro.is_banned || isOnHold(astro.astro_hold_until)) unavailable = { reason: 'astrologer_unavailable', message: `${astro.display_name} is not available right now.` };
+        else if (!astro.is_online || !astro.is_available) unavailable = { reason: 'astrologer_offline', message: `${astro.display_name} is offline right now. Please try again later.` };
+        else if (!astro.channel_available) unavailable = { reason: 'channel_unavailable', message: `${astro.display_name} is not taking ${typeLabel} right now.` };
+        if (unavailable) {
+          socket.emit('consultation_unavailable', { astrologer_id, type, ...unavailable });
+          return socket.emit('error', { message: unavailable.message, code: unavailable.reason });
+        }
 
         if (balance < rate) {
           return socket.emit('insufficient_balance', { required: rate, balance });
@@ -173,10 +250,10 @@ function initSocket(io) {
 
         // Notify astrologer via socket (if online) — retry once after 2s in case set_role is still resolving
         const notifyAstrologer = async (attempt = 1) => {
-          const astroSocketId = onlineAstrologers.get(astrologer_id);
-          console.log(`[notify attempt ${attempt}] astrologer_id=${astrologer_id} socketId=${astroSocketId || 'NOT FOUND'}`);
-          if (astroSocketId) {
-            io.to(astroSocketId).emit('new_consultation_request', {
+          const astroConnected = isAstrologerConnected(astrologer_id);
+          console.log(`[notify attempt ${attempt}] astrologer_id=${astrologer_id} connected=${astroConnected}`);
+          if (astroConnected) {
+            io.to(astroRoom(astrologer_id)).emit('new_consultation_request', {
               consultation_id: consultationId,
               user: socket.user,
               type,
@@ -254,6 +331,11 @@ function initSocket(io) {
           type: consult.rows[0].type,
           webrtc_room: consultation_id,
         });
+
+        // Voice/video: start Agora speech-to-text so the call gets a transcript
+        if (consult.rows[0].type === 'voice' || consult.rows[0].type === 'video') {
+          transcription.start(consultation_id).catch(err => console.error('[stt] start failed:', err.message));
+        }
       } catch (err) {
         console.error('Accept error:', err);
       }
@@ -283,6 +365,25 @@ function initSocket(io) {
 
         const senderRole = socket.role === 'astrologer' ? 'astrologer' : 'user';
         const room = activeRooms.get(consultation_id);
+
+        // Sharing phone numbers / email addresses is not allowed — block and record it
+        if (message_type === 'text') {
+          const check = detectContactInfo(content);
+          if (check.blocked) {
+            await db.query(
+              `INSERT INTO rule_violations (user_id, role, astrologer_id, consultation_id, violation_type, detected, content, channel)
+               VALUES ($1, $2, $3, $4, 'contact_sharing', $5, $6, 'consultation_chat')`,
+              [userId, senderRole, senderRole === 'astrologer' ? socket.astrologerId || null : (room?.astrologerId || null),
+               consultation_id || null, check.detected, String(content).slice(0, 2000)]
+            ).catch(err => console.error('[violation] insert failed:', err.message));
+            return socket.emit('message_blocked', {
+              consultation_id,
+              reason: 'contact_sharing',
+              detected: check.detected,
+              message: blockedMessageText(check.detected),
+            });
+          }
+        }
 
         // Save to old per-session table (backward compat)
         const msg = await db.query(
@@ -318,6 +419,39 @@ function initSocket(io) {
       socket.to(`consultation:${consultation_id}`).emit('peer_typing', { is_typing: false });
     });
 
+    // ─── CALL TRANSCRIPT (Agora speech-to-text segments relayed by the app) ──
+    // Payload: { consultation_id, segments: [{ uid, text, start_ms, language }] }
+    // The astrologer always joins Agora with uid 1 (see astrologer_call_screen.dart),
+    // so uid 1 is the astrologer and any other uid is the user.
+    socket.on('transcript_segments', async ({ consultation_id, segments }) => {
+      try {
+        if (!consultation_id || !Array.isArray(segments) || !segments.length) return;
+        const c = await db.query(
+          `SELECT c.id, c.user_id, a.user_id AS astro_user_id FROM consultations c
+           JOIN astrologers a ON a.id = c.astrologer_id WHERE c.id = $1`,
+          [consultation_id]
+        );
+        if (!c.rows.length || (c.rows[0].user_id !== userId && c.rows[0].astro_user_id !== userId)) return;
+
+        let saved = 0;
+        for (const seg of segments.slice(0, 50)) {
+          const text = String(seg?.text || '').trim();
+          if (!text) continue;
+          const uid = Number.isFinite(Number(seg.uid)) ? Number(seg.uid) : null;
+          const startMs = Number.isFinite(Number(seg.start_ms)) ? Math.trunc(Number(seg.start_ms)) : null;
+          const r = await db.query(
+            `INSERT INTO consultation_transcripts (consultation_id, speaker_role, speaker_uid, text, language, start_ms)
+             VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING`,
+            [consultation_id, uid === 1 ? 'astrologer' : 'user', uid, text.slice(0, 4000), seg.language || null, startMs]
+          );
+          saved += r.rowCount;
+        }
+        if (saved) await db.query('UPDATE consultations SET has_transcript = TRUE WHERE id = $1 AND has_transcript = FALSE', [consultation_id]);
+      } catch (err) {
+        console.error('[transcript] save failed:', err.message);
+      }
+    });
+
     // ─── WEBRTC SIGNALING ────────────────────────────────────────
     socket.on('webrtc_offer', ({ consultation_id, sdp }) => {
       billingEngines.get(consultation_id)?.resetActivity();
@@ -334,6 +468,7 @@ function initSocket(io) {
 
     // ─── END CONSULTATION ────────────────────────────────────────
     socket.on('end_consultation', async ({ consultation_id }) => {
+      transcription.stop(consultation_id).catch(() => {});
       const engine = billingEngines.get(consultation_id);
       if (engine) {
         await engine.stop();
@@ -386,7 +521,20 @@ function initSocket(io) {
     });
 
     // ─── LIVE SESSION ────────────────────────────────────────────
+    // Users blocked by the hosting astrologer can't join, chat or tip in their live sessions
+    const blockedFromLive = async (sessionId) => {
+      const r = await db.query(
+        `SELECT 1 FROM live_sessions ls JOIN astrologer_blocked_users b ON b.astrologer_id = ls.astrologer_id
+         WHERE ls.id = $1 AND b.user_id = $2`,
+        [sessionId, userId]
+      ).catch(() => ({ rows: [] }));
+      return r.rows.length > 0;
+    };
+
     socket.on('join_live', async ({ session_id }) => {
+      if (await blockedFromLive(session_id)) {
+        return socket.emit('error', { message: 'This live session is not available to you.', code: 'blocked' });
+      }
       socket.join(`live:${session_id}`);
       socket.liveSessionId = session_id;
       const count = io.sockets.adapter.rooms.get(`live:${session_id}`)?.size || 0;
@@ -404,6 +552,7 @@ function initSocket(io) {
 
     socket.on('send_tip', async ({ session_id, amount, message }) => {
       try {
+        if (await blockedFromLive(session_id)) return socket.emit('error', { message: 'This live session is not available to you.', code: 'blocked' });
         const walletResult = await db.query('SELECT balance FROM wallets WHERE user_id = $1', [userId]);
         const balance = walletResult.rows[0]?.balance || 0;
         if (balance < amount) return socket.emit('error', { message: 'Insufficient balance' });
@@ -422,7 +571,17 @@ function initSocket(io) {
       }
     });
 
-    socket.on('live_chat', ({ session_id, message }) => {
+    socket.on('live_chat', async ({ session_id, message }) => {
+      if (await blockedFromLive(session_id)) return;
+      const check = detectContactInfo(message);
+      if (check.blocked) {
+        await db.query(
+          `INSERT INTO rule_violations (user_id, role, astrologer_id, violation_type, detected, content, channel)
+           VALUES ($1, $2, $3, 'contact_sharing', $4, $5, 'live_chat')`,
+          [userId, socket.astrologerId ? 'astrologer' : 'user', socket.astrologerId || null, check.detected, String(message).slice(0, 2000)]
+        ).catch(err => console.error('[violation] insert failed:', err.message));
+        return socket.emit('message_blocked', { session_id, reason: 'contact_sharing', detected: check.detected, message: blockedMessageText(check.detected) });
+      }
       io.to(`live:${session_id}`).emit('live_chat_message', {
         user: socket.user.name,
         message,
@@ -441,12 +600,22 @@ function initSocket(io) {
       }
 
       if (socket.astrologerId) {
-        onlineAstrologers.delete(socket.astrologerId);
-        await db.query('UPDATE astrologers SET is_online = false WHERE id = $1', [socket.astrologerId]);
-        io.emit('astrologer_offline', { astrologer_id: socket.astrologerId });
+        const astrologerId = socket.astrologerId;
+        // Only go offline once the LAST socket for this astrologer is gone, and
+        // only after a short grace period so a reconnect doesn't flicker offline.
+        if (!isAstrologerConnected(astrologerId) && !offlineTimers.has(astrologerId)) {
+          offlineTimers.set(astrologerId, setTimeout(async () => {
+            offlineTimers.delete(astrologerId);
+            if (isAstrologerConnected(astrologerId)) return;
+            await db.query('UPDATE astrologers SET is_online = false WHERE id = $1', [astrologerId]).catch(() => {});
+            await broadcastAstrologerStatus(astrologerId).catch(() => {});
+          }, OFFLINE_GRACE_MS));
+        }
 
         // If astrologer disconnects mid-session, refund user for unused partial minute
-        if (socket.consultationId) {
+        // (skipped while another of their sockets — e.g. a reconnect — is still live)
+        if (socket.consultationId && !isAstrologerConnected(astrologerId)) {
+          transcription.stop(socket.consultationId).catch(() => {});
           const engine = billingEngines.get(socket.consultationId);
           if (engine) {
             const partialSeconds = engine.secondsElapsed % 60;
@@ -469,6 +638,7 @@ function initSocket(io) {
       }
       // If user disconnects mid-session, end the active consultation
       if (!socket.astrologerId && socket.consultationId) {
+        transcription.stop(socket.consultationId).catch(() => {});
         const engine = billingEngines.get(socket.consultationId);
         if (engine) {
           await engine.stop();

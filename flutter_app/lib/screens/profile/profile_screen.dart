@@ -8,7 +8,51 @@ import '../../theme/app_theme.dart';
 import '../auth/login_screen.dart';
 import '../family/family_members_screen.dart';
 import '../consultation/chat_history_screen.dart';
+import '../../utils/invite_share.dart';
 import 'edit_profile_screen.dart';
+
+class _InviteCard extends StatelessWidget {
+  final String? name;
+  const _InviteCard({this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.clr.accent;
+    return Builder(
+      builder: (btnContext) => Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => InviteShare.share(btnContext, inviterName: name),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [accent.withValues(alpha: 0.18), accent.withValues(alpha: 0.06)]),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: accent.withValues(alpha: 0.35)),
+            ),
+            child: Row(children: [
+              Container(
+                width: 44, height: 44,
+                decoration: BoxDecoration(color: accent.withValues(alpha: 0.2), shape: BoxShape.circle),
+                child: Icon(Icons.card_giftcard_rounded, color: accent),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Invite friends to Grahvarta', style: TextStyle(color: context.clr.txtPrimary, fontWeight: FontWeight.w700, fontSize: 15)),
+                  const SizedBox(height: 2),
+                  Text('Share the app on WhatsApp, SMS and more', style: TextStyle(color: context.clr.txtMuted, fontSize: 12)),
+                ]),
+              ),
+              Icon(Icons.share_rounded, color: accent),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -53,7 +97,9 @@ class ProfileScreen extends StatelessWidget {
                 decoration: BoxDecoration(color: accentColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
                 child: Text('☀️ ${user!.sunSign} Sun', style: TextStyle(color: accentColor, fontSize: 13)),
               ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
+            _InviteCard(name: user?.name),
+            const SizedBox(height: 20),
             _buildSection(context, s.account, cardColor, textMuted, [
               _buildTile(context, Icons.person_outline, s.editProfile, '', textMuted, accentColor,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen()))),

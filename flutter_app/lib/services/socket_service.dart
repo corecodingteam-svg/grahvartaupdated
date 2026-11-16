@@ -104,6 +104,12 @@ class SocketService {
     _pendingListeners.remove(event);
   }
 
+  /// Remove one specific handler (other screens' handlers for the same event stay).
+  void offHandler(String event, Function(dynamic) handler) {
+    _socket?.off(event, handler);
+    _pendingListeners[event]?.remove(handler);
+  }
+
   // ── Consultation ──────────────────────────────────────────────
   void requestConsultation(String astrologerId, String type) {
     emit('request_consultation', {'astrologer_id': astrologerId, 'type': type});

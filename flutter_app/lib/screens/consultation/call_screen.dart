@@ -7,7 +7,8 @@ import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
 import 'chat_history_screen.dart';
 
-const String _agoraAppId = 'e2e9d562aa754dcca16a5219e557b133';
+// Fallback only — the backend's /agora/token response carries the App ID it signed for
+const String _agoraAppId = 'cfc5ddec9cdd48f09a301aba96991a25';
 
 class CallScreen extends StatefulWidget {
   final Astrologer astrologer;
@@ -66,7 +67,7 @@ class _CallScreenState extends State<CallScreen> {
     try {
       final tokenData = await ApiService.getAgoraToken(channelName, uid: 2);
       final token = tokenData['data']?['token'] ?? tokenData['token'];
-      const appId = _agoraAppId;
+      final appId = (tokenData['app_id'] ?? tokenData['data']?['app_id'] ?? _agoraAppId) as String;
 
       _engine = createAgoraRtcEngine();
       await _engine!.initialize(RtcEngineContext(appId: appId));
@@ -78,10 +79,15 @@ class _CallScreenState extends State<CallScreen> {
           // Force speakerphone — default for audio calls is earpiece
           _engine?.setEnableSpeakerphone(_isSpeakerOn);
         },
+        // uids 900000–900999 are the call-transcription bots (backend
+        // transcription.js), not the astrologer — never treat them as the peer,
+        // otherwise a bot leaving would end the call.
         onUserJoined: (connection, remoteUid, elapsed) {
+          if (remoteUid >= 900000 && remoteUid < 901000) return;
           if (mounted) setState(() { _remoteUid = remoteUid; _remoteJoined = true; });
         },
         onUserOffline: (connection, remoteUid, reason) {
+          if (remoteUid >= 900000 && remoteUid < 901000) return;
           if (!mounted) return;
           setState(() { _remoteJoined = false; _isEnded = true; });
           if (!_dialogShown) _cleanup().then((_) => _showEndDialog({}));
@@ -146,6 +152,23 @@ class _CallScreenState extends State<CallScreen> {
       setState(() => _isEnded = true);
       _cleanup().then((_) => _showEndDialog(data));
     });
+
+    // Astrologer offline / this call type switched off / blocked / account on hold
+    _socket.on('consultation_unavailable', (data) => _closeWithMessage(data is Map ? data['message'] as String? : null));
+    _socket.on('consultation_rejected', (_) => _closeWithMessage('The astrologer is not available right now.'));
+    _socket.on('insufficient_balance', (data) => _closeWithMessage('Insufficient balance. Required: ₹${data is Map ? data['required'] : ''}'));
+  }
+
+  Future<void> _closeWithMessage(String? message) async {
+    if (!mounted || _isEnded) return;
+    setState(() => _isEnded = true);
+    await _cleanup();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message ?? 'This call could not be started.'),
+      backgroundColor: context.clr.error,
+    ));
+    Navigator.of(context).pop();
   }
 
   void _requestConsultation() {
@@ -228,6 +251,9 @@ class _CallScreenState extends State<CallScreen> {
     _socket.off('consultation_started');
     _socket.off('billing_tick');
     _socket.off('consultation_ended');
+    _socket.off('consultation_unavailable');
+    _socket.off('consultation_rejected');
+    _socket.off('insufficient_balance');
     super.dispose();
   }
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Star, FileText, Wallet, Bell, LogOut, ArrowDownCircle, MessageSquare, UserCheck, Gift, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Users, Star, FileText, Wallet, Bell, LogOut, ArrowDownCircle, MessageSquare, UserCheck, Gift, ShieldCheck, ShieldAlert, ScrollText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -15,7 +15,9 @@ const navItems = [
   { to: '/notifications', icon: Bell,             label: 'Notifications',       permission: 'notifications' },
   { to: '/hirings',       icon: UserCheck,        label: 'Hirings',             permission: 'hirings' },
   { to: '/recharge-offers', icon: Gift,           label: 'Recharge Offers',    permission: 'recharge_offers' },
+  { to: '/violators',     icon: ShieldAlert,      label: 'Rule Violators',      permission: 'moderation' },
   { to: '/sub-admins',    icon: ShieldCheck,      label: 'Sub-admins',          permission: null }, // null = superadmin only
+  { to: '/audit-logs',    icon: ScrollText,       label: 'Audit Log',           permission: null },
 ];
 
 export default function Sidebar() {

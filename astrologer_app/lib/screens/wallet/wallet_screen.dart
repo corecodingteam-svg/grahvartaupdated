@@ -185,7 +185,7 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
         'amount': data['amount'], // already in paise from backend
         'currency': data['currency'] ?? 'INR',
         'order_id': data['order_id'],
-        'name': 'AstroVaak',
+        'name': 'Grahvarta',
         'description': 'Wallet Recharge',
         'prefill': {
           'contact': '',

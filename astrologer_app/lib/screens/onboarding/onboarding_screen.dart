@@ -51,33 +51,50 @@ const _pages = [
   ),
 ];
 
+// Every page reserves the same space for each block, so the icon, title and
+// pills sit at identical positions on every page no matter how many lines the
+// text wraps to — nothing jumps while swiping.
+const double _iconBox = 168;
+const double _titleSize = 30;
+const double _titleLineHeight = 1.2;
+const int _titleLines = 2;
+const double _subtitleSize = 15;
+const double _subtitleLineHeight = 1.6;
+const int _subtitleLines = 4;
+const double _pillsBox = 76; // room for two rows of pills
+
 class _OnboardingScreenState extends State<OnboardingScreen> with TickerProviderStateMixin {
   final _pageController = PageController();
-  late AnimationController _bgAnimController;
-  late AnimationController _contentAnimController;
-  late Animation<double> _bgRotation;
+  late final AnimationController _bgAnimController;
+  late final AnimationController _introController; // one-time entrance fade only
   int _currentPage = 0;
 
   @override
   void initState() {
     super.initState();
     _bgAnimController = AnimationController(vsync: this, duration: const Duration(seconds: 20))..repeat();
-    _contentAnimController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
-    _bgRotation = Tween<double>(begin: 0, end: 2 * pi).animate(_bgAnimController);
-    _contentAnimController.forward();
+    _introController = AnimationController(vsync: this, duration: const Duration(milliseconds: 600))..forward();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
     _bgAnimController.dispose();
-    _contentAnimController.dispose();
+    _introController.dispose();
     super.dispose();
+  }
+
+  /// Live, fractional page position (0.0 … pages-1) — drives every transition.
+  double get _page {
+    if (_pageController.hasClients && _pageController.position.hasContentDimensions) {
+      return (_pageController.page ?? _currentPage.toDouble()).clamp(0.0, (_pages.length - 1).toDouble());
+    }
+    return _currentPage.toDouble();
   }
 
   void _nextPage() {
     if (_currentPage < _pages.length - 1) {
-      _pageController.nextPage(duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+      _pageController.nextPage(duration: const Duration(milliseconds: 450), curve: Curves.easeInOutCubic);
     } else {
       _finish();
     }
@@ -90,119 +107,125 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen(isAstrologerMode: true)));
   }
 
-  List<Color> _gradientForPage(int index, bool isDark) {
-    if (isDark) {
-      const darkGradients = [
-        [Color(0xFF2D1B00), Color(0xFF0D0D0D)],
-        [Color(0xFF0D1A2D), Color(0xFF0D0D0D)],
-        [Color(0xFF1A0D2D), Color(0xFF0D0D0D)],
-      ];
-      return darkGradients[index % darkGradients.length];
-    } else {
-      const lightGradients = [
-        [Color(0xFFE8F4FF), Color(0xFFFFFFFF)],
-        [Color(0xFFE0EEFF), Color(0xFFFFFFFF)],
-        [Color(0xFFEEE8FF), Color(0xFFFFFFFF)],
-      ];
-      return lightGradients[index % lightGradients.length];
-    }
-  }
+  static const _darkGradients = [
+    [Color(0xFF2D1B00), Color(0xFF0D0D0D)],
+    [Color(0xFF0D1A2D), Color(0xFF0D0D0D)],
+    [Color(0xFF1A0D2D), Color(0xFF0D0D0D)],
+  ];
+  static const _lightGradients = [
+    [Color(0xFFE8F4FF), Color(0xFFFFFFFF)],
+    [Color(0xFFE0EEFF), Color(0xFFFFFFFF)],
+    [Color(0xFFEEE8FF), Color(0xFFFFFFFF)],
+  ];
 
-  Color _accentForPage(int index, BuildContext context) {
-    if (index == 1) {
-      return context.clr.accentAlt;
-    } else if (index == 2) {
-      return context.clr.accentAlt;
-    }
-    return context.clr.accent;
+  Color _accentForPage(int index, BuildContext context) =>
+      index == 0 ? context.clr.accent : context.clr.accentAlt;
+
+  /// Blend a per-page value for a fractional page position.
+  T _lerpByPage<T>(double page, T Function(int i) of, T Function(T a, T b, double t) lerp) {
+    final i = page.floor().clamp(0, _pages.length - 1);
+    final j = (i + 1).clamp(0, _pages.length - 1);
+    return lerp(of(i), of(j), page - i);
   }
 
   @override
   Widget build(BuildContext context) {
-    final page = _pages[_currentPage];
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gradient = _gradientForPage(_currentPage, isDark);
-    final accentColor = _accentForPage(_currentPage, context);
+    final gradients = isDark ? _darkGradients : _lightGradients;
 
     return Scaffold(
       backgroundColor: context.clr.bg,
-      body: AnimatedContainer(
-        duration: const Duration(milliseconds: 500),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: gradient,
-          ),
-        ),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              _BackgroundSymbols(symbols: page.symbols, rotation: _bgRotation, accentColor: accentColor),
-              Column(
+      body: AnimatedBuilder(
+        animation: _pageController,
+        builder: (context, _) {
+          final page = _page;
+          final top = _lerpByPage<Color>(page, (i) => gradients[i % gradients.length][0], (a, b, t) => Color.lerp(a, b, t)!);
+          final bottom = _lerpByPage<Color>(page, (i) => gradients[i % gradients.length][1], (a, b, t) => Color.lerp(a, b, t)!);
+          final accent = _lerpByPage<Color>(page, (i) => _accentForPage(i, context), (a, b, t) => Color.lerp(a, b, t)!);
+
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [top, bottom]),
+            ),
+            child: SafeArea(
+              child: Stack(
                 children: [
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: TextButton(
-                        onPressed: _finish,
-                        child: Text('Skip', style: TextStyle(color: context.clr.txtMuted, fontSize: 14)),
-                      ),
-                    ),
+                  RepaintBoundary(
+                    child: _BackgroundSymbols(page: page, rotation: _bgAnimController, accentColor: accent),
                   ),
-                  Expanded(
-                    child: PageView.builder(
-                      controller: _pageController,
-                      onPageChanged: (i) {
-                        setState(() => _currentPage = i);
-                        _contentAnimController.forward(from: 0);
-                      },
-                      itemCount: _pages.length,
-                      itemBuilder: (ctx, i) {
-                        final pageAccent = _accentForPage(i, ctx);
-                        return _OnboardingPage(
-                          data: _pages[i],
-                          animController: _contentAnimController,
-                          accentColor: pageAccent,
-                        );
-                      },
+                  FadeTransition(
+                    opacity: CurvedAnimation(parent: _introController, curve: Curves.easeOut),
+                    child: Column(
+                      children: [
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: TextButton(
+                              onPressed: _finish,
+                              child: Text('Skip', style: TextStyle(color: context.clr.txtMuted, fontSize: 14)),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: PageView.builder(
+                            controller: _pageController,
+                            physics: const BouncingScrollPhysics(),
+                            onPageChanged: (i) => setState(() => _currentPage = i),
+                            itemCount: _pages.length,
+                            itemBuilder: (ctx, i) => _OnboardingPage(
+                              data: _pages[i],
+                              accentColor: _accentForPage(i, ctx),
+                              // -1 … 0 … 1 : how far this page is from the centre
+                              offset: (page - i).clamp(-1.0, 1.0),
+                            ),
+                          ),
+                        ),
+                        _BottomControls(
+                          page: page,
+                          currentPage: _currentPage,
+                          total: _pages.length,
+                          accentColor: accent,
+                          onNext: _nextPage,
+                          onSkip: _finish,
+                        ),
+                      ],
                     ),
-                  ),
-                  _BottomControls(
-                    currentPage: _currentPage,
-                    total: _pages.length,
-                    accentColor: accentColor,
-                    onNext: _nextPage,
-                    onSkip: _finish,
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
 }
 
 class _BackgroundSymbols extends StatelessWidget {
-  final List<String> symbols;
+  final double page;
   final Animation<double> rotation;
   final Color accentColor;
 
-  const _BackgroundSymbols({required this.symbols, required this.rotation, required this.accentColor});
+  const _BackgroundSymbols({required this.page, required this.rotation, required this.accentColor});
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // In light mode use a darker shade of accent; in dark mode use accent directly
     final symbolColor = isDark ? accentColor : Color.lerp(accentColor, const Color(0xFF042B59), 0.4)!;
+    final i = page.floor().clamp(0, _pages.length - 1);
+    final j = (i + 1).clamp(0, _pages.length - 1);
     return AnimatedBuilder(
       animation: rotation,
       builder: (_, __) => CustomPaint(
         size: MediaQuery.of(context).size,
-        painter: _SymbolsPainter(symbols: symbols, rotation: rotation.value, color: symbolColor),
+        painter: _SymbolsPainter(
+          from: _pages[i].symbols,
+          to: _pages[j].symbols,
+          blend: page - i,
+          rotation: rotation.value * 2 * pi,
+          color: symbolColor,
+        ),
       ),
     );
   }
@@ -210,65 +233,107 @@ class _BackgroundSymbols extends StatelessWidget {
 
 class _OnboardingPage extends StatelessWidget {
   final _OnboardingData data;
-  final AnimationController animController;
   final Color accentColor;
+  final double offset;
 
-  const _OnboardingPage({required this.data, required this.animController, required this.accentColor});
+  const _OnboardingPage({required this.data, required this.accentColor, required this.offset});
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: animController,
-      builder: (_, child) => FadeTransition(
-        opacity: CurvedAnimation(parent: animController, curve: Curves.easeOut),
-        child: SlideTransition(
-          position: Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
-              .animate(CurvedAnimation(parent: animController, curve: Curves.easeOut)),
-          child: child,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _IconWidget(accentColor: accentColor, icon: data.icon),
-            const SizedBox(height: 48),
-            Text(
-              data.title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: context.clr.txtPrimary,
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
-                height: 1.2,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              data.subtitle,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: context.clr.txtSecondary, fontSize: 15, height: 1.6),
-            ),
-            const SizedBox(height: 32),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.center,
-              children: data.pills.map((p) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+    final scaler = MediaQuery.textScalerOf(context);
+    final titleHeight = scaler.scale(_titleSize) * _titleLineHeight * _titleLines;
+    final subtitleHeight = scaler.scale(_subtitleSize) * _subtitleLineHeight * _subtitleLines;
+    final distance = offset.abs();
+    final opacity = (1 - distance * 1.4).clamp(0.0, 1.0);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        // Gentle parallax: the icon trails the swipe, the text leads it slightly.
+        final content = SizedBox(
+          width: width,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Transform.translate(
+                  offset: Offset(offset * width * 0.35, 0),
+                  child: Transform.scale(
+                    scale: 1 - distance * 0.15,
+                    child: SizedBox(height: _iconBox, child: Center(child: _IconWidget(accentColor: accentColor, icon: data.icon))),
+                  ),
                 ),
-                child: Text(p, style: TextStyle(color: accentColor, fontSize: 12, fontWeight: FontWeight.w600)),
-              )).toList(),
+                const SizedBox(height: 40),
+                Transform.translate(
+                  offset: Offset(offset * width * -0.08, 0),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    SizedBox(
+                      height: titleHeight,
+                      child: Center(
+                        child: Text(
+                          data.title,
+                          textAlign: TextAlign.center,
+                          maxLines: _titleLines,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.clr.txtPrimary,
+                            fontSize: _titleSize,
+                            fontWeight: FontWeight.w800,
+                            height: _titleLineHeight,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: subtitleHeight,
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: Text(
+                          data.subtitle,
+                          textAlign: TextAlign.center,
+                          maxLines: _subtitleLines,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: context.clr.txtSecondary, fontSize: _subtitleSize, height: _subtitleLineHeight),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      height: _pillsBox,
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.center,
+                          children: data.pills.map((p) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: accentColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+                            ),
+                            child: Text(p, style: TextStyle(color: accentColor, fontSize: 12, fontWeight: FontWeight.w600)),
+                          )).toList(),
+                        ),
+                      ),
+                    ),
+                  ]),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+
+        return Opacity(
+          opacity: opacity,
+          // Shrinks (never grows) the identical block on very short screens
+          child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: content)),
+        );
+      },
     );
   }
 }
@@ -316,6 +381,7 @@ class _IconWidget extends StatelessWidget {
 }
 
 class _BottomControls extends StatelessWidget {
+  final double page;
   final int currentPage;
   final int total;
   final Color accentColor;
@@ -323,6 +389,7 @@ class _BottomControls extends StatelessWidget {
   final VoidCallback onSkip;
 
   const _BottomControls({
+    required this.page,
     required this.currentPage,
     required this.total,
     required this.accentColor,
@@ -333,6 +400,9 @@ class _BottomControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLast = currentPage == total - 1;
+    final inactive = context.clr.txtMuted.withValues(alpha: 0.35);
+    // fades the "Sign in" hint out as the last page arrives instead of popping
+    final hintOpacity = (total - 1 - page).clamp(0.0, 1.0);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
@@ -341,14 +411,14 @@ class _BottomControls extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(total, (i) {
-              final isActive = i == currentPage;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
+              // dot width/colour follow the finger, not the settled page
+              final t = (1 - (page - i).abs()).clamp(0.0, 1.0);
+              return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 4),
-                width: isActive ? 24 : 8,
+                width: 8 + 16 * t,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: isActive ? accentColor : context.clr.txtMuted.withValues(alpha: 0.35),
+                  color: Color.lerp(inactive, accentColor, t),
                   borderRadius: BorderRadius.circular(4),
                 ),
               );
@@ -357,8 +427,7 @@ class _BottomControls extends StatelessWidget {
           const SizedBox(height: 28),
           GestureDetector(
             onTap: onNext,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
+            child: Container(
               width: double.infinity,
               height: 56,
               decoration: BoxDecoration(
@@ -367,23 +436,35 @@ class _BottomControls extends StatelessWidget {
                 boxShadow: [BoxShadow(color: accentColor.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 8))],
               ),
               child: Center(
-                child: Text(
-                  isLast ? 'Get Started  →' : 'Continue  →',
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: Text(
+                    isLast ? 'Get Started  →' : 'Continue  →',
+                    key: ValueKey(isLast),
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+                  ),
                 ),
               ),
             ),
           ),
-          if (!isLast) ...[
-            const SizedBox(height: 16),
-            GestureDetector(
-              onTap: onSkip,
-              child: Text(
-                'Already registered? Sign in',
-                style: TextStyle(color: context.clr.txtMuted, fontSize: 13),
+          const SizedBox(height: 16),
+          // Always reserve the hint's space so the button never shifts
+          SizedBox(
+            height: 18,
+            child: Opacity(
+              opacity: hintOpacity,
+              child: IgnorePointer(
+                ignoring: isLast,
+                child: GestureDetector(
+                  onTap: onSkip,
+                  child: Text(
+                    'Already have an account? Sign in',
+                    style: TextStyle(color: context.clr.txtMuted, fontSize: 13),
+                  ),
+                ),
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -391,33 +472,40 @@ class _BottomControls extends StatelessWidget {
 }
 
 class _SymbolsPainter extends CustomPainter {
-  final List<String> symbols;
+  final List<String> from;
+  final List<String> to;
+  final double blend; // 0 = only `from`, 1 = only `to`
   final double rotation;
   final Color color;
 
-  _SymbolsPainter({required this.symbols, required this.rotation, required this.color});
+  _SymbolsPainter({required this.from, required this.to, required this.blend, required this.rotation, required this.color});
 
-  @override
-  void paint(Canvas canvas, Size size) {
+  void _paintSet(Canvas canvas, Size size, List<String> symbols, double alpha) {
+    if (alpha <= 0.01) return;
     final textPainter = TextPainter(textDirection: TextDirection.ltr);
     for (int i = 0; i < symbols.length; i++) {
       final angle = rotation + (i * 2 * pi / symbols.length);
-      final radiusX = size.width * 0.42;
-      final radiusY = size.height * 0.38;
-      final x = size.width / 2 + cos(angle) * radiusX;
-      final y = size.height / 2 + sin(angle) * radiusY;
-      final opacity = 0.15 + (i % 4) * 0.06;
+      final x = size.width / 2 + cos(angle) * size.width * 0.42;
+      final y = size.height / 2 + sin(angle) * size.height * 0.38;
+      final opacity = (0.15 + (i % 4) * 0.06) * alpha;
       final fontSize = 12.0 + (i % 3) * 5;
-
-      textPainter.text = TextSpan(
-        text: symbols[i],
-        style: TextStyle(fontSize: fontSize, color: color.withValues(alpha: opacity)),
-      );
+      textPainter.text = TextSpan(text: symbols[i], style: TextStyle(fontSize: fontSize, color: color.withValues(alpha: opacity)));
       textPainter.layout();
       textPainter.paint(canvas, Offset(x - textPainter.width / 2, y - textPainter.height / 2));
     }
   }
 
   @override
-  bool shouldRepaint(_SymbolsPainter old) => old.rotation != rotation || old.color != color;
+  void paint(Canvas canvas, Size size) {
+    if (identical(from, to)) {
+      _paintSet(canvas, size, from, 1);
+    } else {
+      _paintSet(canvas, size, from, 1 - blend);
+      _paintSet(canvas, size, to, blend);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SymbolsPainter old) =>
+      old.rotation != rotation || old.color != color || old.blend != blend || !identical(old.from, from) || !identical(old.to, to);
 }

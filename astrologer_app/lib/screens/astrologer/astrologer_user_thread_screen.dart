@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/block_user.dart';
+import 'consultation_transcript_screen.dart';
 
 class AstrologerUserThreadScreen extends StatefulWidget {
   final String userId;
   final String userName;
+  final bool isBlocked;
 
-  const AstrologerUserThreadScreen({super.key, required this.userId, required this.userName});
+  const AstrologerUserThreadScreen({super.key, required this.userId, required this.userName, this.isBlocked = false});
 
   @override
   State<AstrologerUserThreadScreen> createState() => _AstrologerUserThreadScreenState();
@@ -20,6 +23,23 @@ class _AstrologerUserThreadScreenState extends State<AstrologerUserThreadScreen>
   bool _hasMore = true;
   bool _loadingMore = false;
   String? _oldestTimestamp;
+  late bool _blocked = widget.isBlocked;
+
+  Future<void> _toggleBlock() async {
+    if (_blocked) {
+      try {
+        await ApiService.unblockUser(widget.userId);
+        if (!mounted) return;
+        setState(() => _blocked = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${widget.userName} has been unblocked')));
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not unblock: $e'), backgroundColor: context.clr.error));
+      }
+    } else {
+      final ok = await confirmAndBlockUser(context, userId: widget.userId, userName: widget.userName);
+      if (ok && mounted) setState(() => _blocked = true);
+    }
+  }
 
   @override
   void initState() {
@@ -128,9 +148,26 @@ class _AstrologerUserThreadScreenState extends State<AstrologerUserThreadScreen>
           const SizedBox(width: 10),
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(widget.userName, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: context.clr.txtPrimary)),
-            Text('All sessions', style: TextStyle(color: context.clr.txtMuted, fontSize: 11)),
+            Text(_blocked ? 'Blocked' : 'All sessions', style: TextStyle(color: _blocked ? context.clr.error : context.clr.txtMuted, fontSize: 11)),
           ]),
         ]),
+        actions: [
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert, color: context.clr.txtPrimary),
+            color: context.clr.card,
+            onSelected: (_) => _toggleBlock(),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'block',
+                child: Row(children: [
+                  Icon(_blocked ? Icons.lock_open : Icons.block, color: _blocked ? context.clr.success : context.clr.error, size: 18),
+                  const SizedBox(width: 10),
+                  Text(_blocked ? 'Unblock user' : 'Block user', style: TextStyle(color: _blocked ? context.clr.success : context.clr.error)),
+                ]),
+              ),
+            ],
+          ),
+        ],
       ),
       bottomNavigationBar: _buildFooter(),
       body: _isLoading
@@ -223,17 +260,37 @@ class _AstrologerUserThreadScreenState extends State<AstrologerUserThreadScreen>
     final role = msg['sender_role'] ?? msg['sender_type'] ?? 'user';
 
     if (type == 'session_start' || type == 'session_end') {
+      final divider = Center(child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: context.clr.accent.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: context.clr.accent.withValues(alpha: 0.2)),
+        ),
+        child: Text(msg['message'] ?? msg['content'] ?? '', style: TextStyle(color: context.clr.accent, fontSize: 11, fontWeight: FontWeight.w500)),
+      ));
+      // Sub-link under a voice/video session: open the saved call transcript
+      final showTranscript = type == 'session_start' && msg['has_transcript'] == true && msg['consultation_id'] != null;
+      final isVideo = msg['consultation_type'] == 'video';
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Center(child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: BoxDecoration(
-            color: context.clr.accent.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: context.clr.accent.withValues(alpha: 0.2)),
-          ),
-          child: Text(msg['message'] ?? msg['content'] ?? '', style: TextStyle(color: context.clr.accent, fontSize: 11, fontWeight: FontWeight.w500)),
-        )),
+        child: Column(children: [
+          divider,
+          if (showTranscript) ...[
+            const SizedBox(height: 6),
+            GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => ConsultationTranscriptScreen(consultationId: msg['consultation_id'].toString(), userName: widget.userName),
+              )),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(isVideo ? Icons.videocam_outlined : Icons.call_outlined, size: 14, color: context.clr.accentAlt),
+                const SizedBox(width: 4),
+                Text('View ${isVideo ? 'video' : 'voice'} call transcript',
+                    style: TextStyle(color: context.clr.accentAlt, fontSize: 12, fontWeight: FontWeight.w600, decoration: TextDecoration.underline)),
+              ]),
+            ),
+          ],
+        ]),
       );
     }
 

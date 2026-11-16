@@ -208,7 +208,7 @@ exports.processDueWithdrawals = async () => {
           purpose: 'payout',
           queue_if_low_balance: true,
           reference_id: req.id,
-          narration: 'AstroVaak Earnings',
+          narration: 'Grahvarta Earnings',
         }, { headers: { Authorization: `Basic ${RZP_AUTH}`, 'X-Payout-Idempotency': req.id } });
 
         await db.query(`

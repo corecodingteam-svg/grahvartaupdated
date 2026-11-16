@@ -4,8 +4,13 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/stt_decoder.dart';
 
-const String _agoraAppId = 'e2e9d562aa754dcca16a5219e557b133';
+// Fallback only — the backend's /agora/token response carries the App ID it signed for
+const String _agoraAppId = 'cfc5ddec9cdd48f09a301aba96991a25';
+
+// Agora STT bots join the channel with these uids (backend/src/utils/transcription.js)
+bool _isSttBot(int uid) => uid >= 900000 && uid < 901000;
 
 class AstrologerCallScreen extends StatefulWidget {
   final String consultationId;
@@ -71,14 +76,26 @@ class _AstrologerCallScreenState extends State<AstrologerCallScreen> {
       final token = tokenData['data']?['token'] ?? tokenData['token'];
 
       _engine = createAgoraRtcEngine();
-      await _engine!.initialize(const RtcEngineContext(appId: _agoraAppId));
+      await _engine!.initialize(RtcEngineContext(appId: (tokenData['app_id'] ?? tokenData['data']?['app_id'] ?? _agoraAppId) as String));
 
       _engine!.registerEventHandler(RtcEngineEventHandler(
         onUserJoined: (_, uid, __) {
+          if (_isSttBot(uid)) return; // transcription bots are not the caller
           if (mounted) setState(() { _remoteUid = uid; _remoteJoined = true; });
         },
         onUserOffline: (_, uid, __) {
+          if (_isSttBot(uid)) return;
           if (mounted) setState(() => _remoteJoined = false);
+        },
+        // Agora speech-to-text publishes recognised text as data-stream messages;
+        // relay finished sentences to the server so the call gets a transcript.
+        onStreamMessage: (_, remoteUid, __, data, ___, ____) {
+          final seg = SttDecoder.decode(data);
+          if (seg == null) return;
+          SocketService.instance.emit('transcript_segments', {
+            'consultation_id': widget.consultationId,
+            'segments': [seg.toJson()],
+          });
         },
       ));
 

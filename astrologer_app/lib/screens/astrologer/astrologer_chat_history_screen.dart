@@ -145,7 +145,7 @@ class _ThreadTile extends StatelessWidget {
     return InkWell(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => AstrologerUserThreadScreen(userId: userId, userName: userName)),
+        MaterialPageRoute(builder: (_) => AstrologerUserThreadScreen(userId: userId, userName: userName, isBlocked: thread['is_blocked'] == true)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

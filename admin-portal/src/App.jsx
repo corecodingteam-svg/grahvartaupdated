@@ -15,6 +15,8 @@ import CommunityPage from './pages/CommunityPage';
 import HiringsPage from './pages/HiringsPage';
 import RechargeOffersPage from './pages/RechargeOffersPage';
 import SubadminsPage from './pages/SubadminsPage';
+import ViolatorsPage from './pages/ViolatorsPage';
+import AuditLogsPage from './pages/AuditLogsPage';
 
 function ProtectedRoute({ children }) {
   const { admin, loading } = useAuth();
@@ -46,7 +48,9 @@ function AppRoutes() {
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="hirings" element={<HiringsPage />} />
         <Route path="recharge-offers" element={<RechargeOffersPage />} />
+        <Route path="violators" element={<ViolatorsPage />} />
         <Route path="sub-admins" element={<SuperAdminRoute><SubadminsPage /></SuperAdminRoute>} />
+        <Route path="audit-logs" element={<SuperAdminRoute><AuditLogsPage /></SuperAdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

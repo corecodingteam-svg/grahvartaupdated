@@ -10,6 +10,7 @@ import '../../models/astrologer.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/contact_filter.dart';
 import 'chat_history_screen.dart';
 
 class ChatMessage {
@@ -183,6 +184,14 @@ class _ChatScreenState extends State<ChatScreen> {
     _socket.on('insufficient_balance', (data) {
       _bloc.add(ChatSystemMessage('⚠️ Insufficient balance. Required: ₹${data['required']}'));
     });
+
+    // Server-side safety net for the contact-details rule
+    _socket.on('message_blocked', (data) {
+      if (!mounted) return;
+      final msg = (data is Map ? data['message'] : null) as String? ?? 'Message not sent.';
+      _bloc.add(ChatSystemMessage('⚠️ $msg'));
+      _showContactBlocked(msg);
+    });
   }
 
   void _requestConsultation() {
@@ -190,10 +199,27 @@ class _ChatScreenState extends State<ChatScreen> {
     _bloc.add(ChatSystemMessage('Connecting to ${widget.astrologer.displayName}…'));
   }
 
+  void _showContactBlocked(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(message),
+        backgroundColor: context.clr.error,
+        duration: const Duration(seconds: 4),
+      ));
+  }
+
   void _sendMessage() {
     final text = _messageCtrl.text.trim();
     final state = _bloc.state;
     if (text.isEmpty || state.consultationId == null) return;
+
+    // Phone numbers / email addresses may not be shared in chat
+    final detected = ContactFilter.detect(text);
+    if (detected.isNotEmpty) {
+      _showContactBlocked(ContactFilter.blockedMessage(detected));
+      return; // keep the text so the user can edit it
+    }
 
     _bloc.add(ChatMessageSent(text));
     _socket.sendMessage(state.consultationId!, text);
@@ -409,6 +435,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _socket.off('consultation_rejected');
     _socket.off('insufficient_balance');
     _socket.off('error');
+    _socket.off('message_blocked');
     _socket.reset();
     _bloc.close();
     super.dispose();

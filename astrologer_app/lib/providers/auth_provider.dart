@@ -23,6 +23,9 @@ class AstrologerProfile {
   final int totalConsultations;
   final bool isOnline;
   final bool isAvailable;
+  final bool isChatAvailable;
+  final bool isCallAvailable;
+  final bool isVideoAvailable;
   final String approvalStatus; // pending, approved, rejected
 
   AstrologerProfile({
@@ -43,6 +46,9 @@ class AstrologerProfile {
     this.totalConsultations = 0,
     this.isOnline = false,
     this.isAvailable = true,
+    this.isChatAvailable = true,
+    this.isCallAvailable = true,
+    this.isVideoAvailable = true,
     this.approvalStatus = 'pending',
   });
 
@@ -71,11 +77,14 @@ class AstrologerProfile {
       totalConsultations: json['total_consultations'] ?? 0,
       isOnline: json['is_online'] ?? false,
       isAvailable: json['is_available'] ?? true,
+      isChatAvailable: json['is_chat_available'] ?? true,
+      isCallAvailable: json['is_call_available'] ?? true,
+      isVideoAvailable: json['is_video_available'] ?? true,
       approvalStatus: json['approval_status'] ?? json['status'] ?? 'pending',
     );
   }
 
-  AstrologerProfile copyWith({bool? isAvailable, bool? isOnline}) => AstrologerProfile(
+  AstrologerProfile copyWith({bool? isAvailable, bool? isOnline, bool? isChatAvailable, bool? isCallAvailable, bool? isVideoAvailable}) => AstrologerProfile(
     id: id,
     userId: userId,
     displayName: displayName,
@@ -93,6 +102,9 @@ class AstrologerProfile {
     totalConsultations: totalConsultations,
     isOnline: isOnline ?? this.isOnline,
     isAvailable: isAvailable ?? this.isAvailable,
+    isChatAvailable: isChatAvailable ?? this.isChatAvailable,
+    isCallAvailable: isCallAvailable ?? this.isCallAvailable,
+    isVideoAvailable: isVideoAvailable ?? this.isVideoAvailable,
     approvalStatus: approvalStatus,
   );
 

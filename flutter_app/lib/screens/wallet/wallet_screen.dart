@@ -14,7 +14,7 @@ class WalletScreen extends StatefulWidget {
   State<WalletScreen> createState() => _WalletScreenState();
 }
 
-class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderStateMixin {
+class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
   late Razorpay _razorpay;
   WalletData? _wallet;
@@ -22,6 +22,7 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
   List<RechargeOffer> _offers = [];
   bool _isLoading = true;
   double _pendingAmount = 0;
+  String? _pendingOrderId;
 
   @override
   void initState() {
@@ -31,6 +32,8 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
+    WidgetsBinding.instance.addObserver(this);
+    _reconcile(silent: true);
     _loadData().then((_) {
       if (widget.initialAmount != null && mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) => _showAddMoneySheet(presetAmount: widget.initialAmount));
@@ -40,19 +43,53 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     _razorpay.clear();
     super.dispose();
   }
 
+  // Returning from a payment app (UPI / MobiKwik / bank page) — check for paid top-ups
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _pendingOrderId != null) _reconcile();
+  }
+
+  /// Server-side check with Razorpay; credits any paid-but-unconfirmed top-up.
+  Future<void> _reconcile({bool silent = false, int attempts = 1}) async {
+    for (var i = 0; i < attempts; i++) {
+      try {
+        final credited = await ApiService.reconcileWalletTopups();
+        if (credited > 0) {
+          _pendingOrderId = null;
+          await _loadData();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Text('Your recharge has been added to the wallet'),
+              backgroundColor: context.clr.success,
+            ));
+          }
+          return;
+        }
+      } catch (_) {/* offline etc. — the server also reconciles on its own */}
+      if (i < attempts - 1) await Future.delayed(const Duration(seconds: 4));
+    }
+    if (!silent && mounted && _pendingOrderId != null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Payment is being confirmed. If money was deducted it will be added to your wallet automatically within a few minutes.'),
+        duration: Duration(seconds: 6),
+      ));
+    }
+  }
+
   void _onPaymentSuccess(PaymentSuccessResponse response) async {
     try {
       final updated = await ApiService.verifyAndCredit({
-        'order_id': response.orderId,
+        'order_id': response.orderId ?? _pendingOrderId,
         'payment_id': response.paymentId,
         'signature': response.signature,
-        'amount': _pendingAmount,
       });
+      _pendingOrderId = null;
       if (mounted) {
         setState(() => _wallet = updated);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -62,22 +99,28 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
         _loadData();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Payment verification failed: $e'), backgroundColor: context.clr.error),
-      );
+      // Signature missing/invalid or network issue — let the server confirm with Razorpay
+      await _reconcile(attempts: 3);
     }
   }
 
   void _onPaymentError(PaymentFailureResponse response) {
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Payment failed: ${response.message}'), backgroundColor: context.clr.error),
-    );
+    // Some wallets report an error/cancel even though the payment went through
+    _reconcile(silent: true, attempts: 2).then((_) {
+      if (mounted && _pendingOrderId != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Payment failed: ${response.message}'), backgroundColor: context.clr.error),
+        );
+      }
+    });
   }
 
   void _onExternalWallet(ExternalWalletResponse response) {
+    // Payment continues in another app; check when the user comes back (and now)
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('External wallet: ${response.walletName}')),
+      SnackBar(content: Text('Completing payment with ${response.walletName}…')),
     );
+    _reconcile(attempts: 3);
   }
 
   Future<void> _loadData() async {
@@ -274,13 +317,14 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
       final data = order['data'];
       // Use server-determined wallet_credit (includes bonus if applicable)
       _pendingAmount = (data['wallet_credit'] as num?)?.toDouble() ?? amount;
+      _pendingOrderId = data['order_id'] as String?;
 
       final options = {
         'key': data['key'],
         'amount': data['amount'], // already in paise from backend
         'currency': data['currency'] ?? 'INR',
         'order_id': data['order_id'],
-        'name': 'AstroVaak',
+        'name': 'Grahvarta',
         'description': 'Wallet Recharge',
         'prefill': {
           'contact': '',

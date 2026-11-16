@@ -166,16 +166,147 @@ exports.registerAsAstrologer = async (req, res) => {
   }
 };
 
+// PATCH /astrologers/availability
+// Body (all optional): { is_available, is_chat_available, is_call_available, is_video_available }
+//  - is_available is the master Online/Offline switch
+//  - the per-channel flags decide which of chat / voice call / video call users can start
 exports.updateAvailability = async (req, res) => {
   try {
-    const { is_available } = req.body;
-    const astro = await db.query('SELECT id, status FROM astrologers WHERE user_id = $1', [req.user.id]);
+    const astro = await db.query(
+      `SELECT a.id, a.status, a.is_banned, u.hold_until FROM astrologers a JOIN users u ON u.id = a.user_id WHERE a.user_id = $1`,
+      [req.user.id]
+    );
     if (!astro.rows.length) return res.status(403).json({ success: false, message: 'Not an astrologer' });
-    if (astro.rows[0].status !== 'approved') {
+    const a = astro.rows[0];
+    if (a.status !== 'approved') {
       return res.status(403).json({ success: false, message: 'Your account is pending approval' });
     }
-    await db.query('UPDATE astrologers SET is_available = $1, is_online = $1 WHERE user_id = $2', [is_available, req.user.id]);
-    res.json({ success: true, message: 'Availability updated' });
+    const onHold = a.hold_until && new Date(a.hold_until).getTime() > Date.now();
+    if (req.body.is_available === true && (a.is_banned || onHold)) {
+      return res.status(403).json({
+        success: false,
+        code: onHold ? 'ACCOUNT_ON_HOLD' : 'ACCOUNT_BANNED',
+        message: onHold ? 'Your account is on hold. You cannot go online until the hold ends.' : 'Your account has been banned.',
+      });
+    }
+
+    const sets = [];
+    const params = [];
+    for (const k of ['is_available', 'is_chat_available', 'is_call_available', 'is_video_available']) {
+      if (typeof req.body[k] === 'boolean') { params.push(req.body[k]); sets.push(`${k} = $${params.length}`); }
+    }
+    if (!sets.length) return res.status(400).json({ success: false, message: 'Nothing to update' });
+
+    // Online = the master switch is on AND the astrologer app is actually connected
+    const connected = req.io?.isAstrologerConnected ? req.io.isAstrologerConnected(a.id) : true;
+    params.push(connected);
+    sets.push(`is_online = (COALESCE(${typeof req.body.is_available === 'boolean' ? '$1' : 'is_available'}, FALSE) AND $${params.length})`);
+    params.push(a.id);
+    const updated = await db.query(
+      `UPDATE astrologers SET ${sets.join(', ')} WHERE id = $${params.length}
+       RETURNING id, is_online, is_available, is_chat_available, is_call_available, is_video_available`,
+      params
+    );
+    if (req.io?.broadcastAstrologerStatus) await req.io.broadcastAstrologerStatus(a.id);
+    res.json({ success: true, message: 'Availability updated', data: updated.rows[0] });
+  } catch (err) {
+    console.error('updateAvailability error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ─── Blocking users ───────────────────────────────────────────────────────────
+
+async function myAstrologerId(userId) {
+  const r = await db.query('SELECT id FROM astrologers WHERE user_id = $1', [userId]);
+  return r.rows[0]?.id || null;
+}
+
+// GET /astrologers/me/blocked-users
+exports.listBlockedUsers = async (req, res) => {
+  try {
+    const astroId = await myAstrologerId(req.user.id);
+    if (!astroId) return res.status(403).json({ success: false, message: 'Not an astrologer' });
+    const r = await db.query(
+      `SELECT b.user_id, b.reason, b.created_at, u.name AS user_name, u.avatar_url AS user_avatar
+       FROM astrologer_blocked_users b JOIN users u ON u.id = b.user_id
+       WHERE b.astrologer_id = $1 ORDER BY b.created_at DESC`,
+      [astroId]
+    );
+    res.json({ success: true, data: r.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// POST /astrologers/me/blocked-users/:userId  { reason? }
+exports.blockUser = async (req, res) => {
+  try {
+    const astroId = await myAstrologerId(req.user.id);
+    if (!astroId) return res.status(403).json({ success: false, message: 'Not an astrologer' });
+    const { userId } = req.params;
+    if (userId === req.user.id) return res.status(400).json({ success: false, message: 'You cannot block yourself' });
+    const u = await db.query('SELECT id FROM users WHERE id = $1', [userId]);
+    if (!u.rows.length) return res.status(404).json({ success: false, message: 'User not found' });
+
+    await db.query(
+      `INSERT INTO astrologer_blocked_users (astrologer_id, user_id, reason) VALUES ($1, $2, $3)
+       ON CONFLICT (astrologer_id, user_id) DO UPDATE SET reason = EXCLUDED.reason`,
+      [astroId, userId, (req.body?.reason || '').trim() || null]
+    );
+
+    // Drop any waiting request from this user and end a session in progress
+    const open = await db.query(
+      `SELECT id, status FROM consultations WHERE astrologer_id = $1 AND user_id = $2 AND status IN ('queued', 'active')`,
+      [astroId, userId]
+    );
+    for (const c of open.rows) {
+      if (c.status === 'queued') {
+        await db.query(`UPDATE consultations SET status = 'cancelled', ended_at = NOW() WHERE id = $1`, [c.id]);
+        await db.query(`UPDATE consultation_queue SET status = 'cancelled' WHERE consultation_id = $1`, [c.id]);
+        await db.query('UPDATE astrologers SET queue_count = GREATEST(queue_count - 1, 0) WHERE id = $1', [astroId]);
+        req.io?.to(`consultation:${c.id}`).emit('consultation_rejected', { consultation_id: c.id, reason: 'blocked' });
+      }
+    }
+    res.json({ success: true, message: 'User blocked', active_consultation_ids: open.rows.filter(c => c.status === 'active').map(c => c.id) });
+  } catch (err) {
+    console.error('blockUser error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// DELETE /astrologers/me/blocked-users/:userId
+exports.unblockUser = async (req, res) => {
+  try {
+    const astroId = await myAstrologerId(req.user.id);
+    if (!astroId) return res.status(403).json({ success: false, message: 'Not an astrologer' });
+    await db.query('DELETE FROM astrologer_blocked_users WHERE astrologer_id = $1 AND user_id = $2', [astroId, req.params.userId]);
+    res.json({ success: true, message: 'User unblocked' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ─── Call transcripts ─────────────────────────────────────────────────────────
+
+// GET /astrologers/consultations/:id/transcript — the astrologer of that consultation only
+exports.getConsultationTranscript = async (req, res) => {
+  try {
+    const astroId = await myAstrologerId(req.user.id);
+    if (!astroId) return res.status(403).json({ success: false, message: 'Not an astrologer' });
+    const c = await db.query(
+      `SELECT c.id, c.type, c.started_at, c.ended_at, c.duration_seconds, u.name AS user_name
+       FROM consultations c JOIN users u ON u.id = c.user_id
+       WHERE c.id = $1 AND c.astrologer_id = $2`,
+      [req.params.id, astroId]
+    );
+    if (!c.rows.length) return res.status(404).json({ success: false, message: 'Consultation not found' });
+    const t = await db.query(
+      `SELECT id, speaker_role, text, language, start_ms, spoken_at FROM consultation_transcripts
+       WHERE consultation_id = $1 ORDER BY spoken_at ASC, start_ms ASC NULLS LAST, id ASC`,
+      [req.params.id]
+    );
+    res.json({ success: true, data: { consultation: c.rows[0], segments: t.rows } });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -272,7 +403,8 @@ exports.getChatThreads = async (req, res) => {
         ct.last_message,
         ct.last_message_at,
         u.name AS user_name,
-        u.avatar_url AS user_avatar
+        u.avatar_url AS user_avatar,
+        EXISTS (SELECT 1 FROM astrologer_blocked_users b WHERE b.astrologer_id = ct.astrologer_id AND b.user_id = ct.user_id) AS is_blocked
       FROM chat_threads ct
       JOIN users u ON u.id = ct.user_id
       WHERE ct.astrologer_id = $1
@@ -311,8 +443,10 @@ exports.getUserThreadMessages = async (req, res) => {
     const result = await db.query(`
       SELECT * FROM (
         SELECT tm.id, tm.thread_id, tm.consultation_id, tm.sender_id, tm.sender_role,
-               tm.message, tm.message_type, tm.created_at
+               tm.message, tm.message_type, tm.created_at,
+               c.type AS consultation_type, COALESCE(c.has_transcript, FALSE) AS has_transcript
         FROM thread_messages tm
+        LEFT JOIN consultations c ON c.id = tm.consultation_id
         WHERE tm.thread_id = $1
           ${beforeClause}
         ORDER BY tm.created_at DESC

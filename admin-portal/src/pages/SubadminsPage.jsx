@@ -15,6 +15,7 @@ const PERMISSIONS = [
   { key: 'notifications', label: 'Notifications' },
   { key: 'hirings', label: 'Hirings' },
   { key: 'recharge_offers', label: 'Recharge Offers' },
+  { key: 'moderation', label: 'Rule Violators' },
 ];
 
 function SubadminModal({ isOpen, onClose, onSave, mode = 'create', initialData = null }) {

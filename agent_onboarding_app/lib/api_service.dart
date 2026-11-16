@@ -26,20 +26,46 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> data, {int okStatus = 200}) async {
+    final http.Response r;
+    try {
+      r = await http
+          .post(Uri.parse('$_base$path'), headers: {'Content-Type': 'application/json'}, body: jsonEncode(data))
+          .timeout(const Duration(seconds: 30));
+    } on Exception {
+      throw 'Unable to connect. Please check your internet connection.';
+    }
+    Map<String, dynamic> body;
+    try {
+      body = jsonDecode(r.body) as Map<String, dynamic>;
+    } catch (_) {
+      throw 'Something went wrong. Please try again.';
+    }
+    if (r.statusCode != okStatus) throw body['message'] ?? 'Request failed';
+    return body;
+  }
+
+  /// Step 1: emails a 5-digit code. Throws the server message on conflict
+  /// (number / email / device already registered) or rate limit.
+  static Future<void> sendEmailOtp({required String email, required String phone, required String deviceId}) async {
+    await _post('/hirings/send-otp', {'email': email, 'phone': phone, 'device_id': deviceId});
+  }
+
+  /// Returns the one-time verification token required by [submitApplication].
+  static Future<String> verifyEmailOtp({required String email, required String otp}) async {
+    final body = await _post('/hirings/verify-otp', {'email': email, 'otp': otp});
+    return body['data']['verification_token'] as String;
+  }
+
   static Future<Map<String, dynamic>> submitApplication(Map<String, dynamic> data) async {
-    final r = await http.post(
-      Uri.parse('$_base/hirings/apply'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data),
-    );
-    final body = jsonDecode(r.body);
-    if (r.statusCode != 201) throw body['message'] ?? 'Submission failed';
+    final body = await _post('/hirings/apply', data, okStatus: 201);
     return body['data'] as Map<String, dynamic>;
   }
 
-  static Future<Map<String, dynamic>?> getApplicationStatus(String phone) async {
+  static Future<Map<String, dynamic>?> getApplicationStatus(String phone, {String? deviceId}) async {
     try {
-      final r = await http.get(Uri.parse('$_base/hirings/status?phone=${Uri.encodeComponent(phone)}'));
+      final q = 'phone=${Uri.encodeComponent(phone)}${deviceId != null ? '&device_id=${Uri.encodeComponent(deviceId)}' : ''}';
+      final r = await http.get(Uri.parse('$_base/hirings/status?$q'));
       final body = jsonDecode(r.body);
       if (r.statusCode == 404) return null; // Application not submitted yet
       if (r.statusCode != 200) throw body['message'] ?? 'Failed to load status';

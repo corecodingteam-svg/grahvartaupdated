@@ -38,6 +38,8 @@ app.use(helmet({ crossOriginEmbedderPolicy: false }));
 app.use(cors(corsOptions));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 200 }));
 app.use(morgan('dev'));
+// Razorpay webhook needs the raw body for signature verification — must be before express.json()
+app.post('/api/wallet/razorpay-webhook', express.raw({ type: '*/*', limit: '1mb' }), require('./src/controllers/walletController').razorpayWebhook);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', require('express').static(require('path').join(__dirname, 'uploads')));
@@ -78,6 +80,12 @@ cron.schedule('0 7 * * *', async () => {
 cron.schedule('0 * * * *', async () => {
   const { processDueWithdrawals } = require('./src/controllers/withdrawalController');
   await processDueWithdrawals();
+});
+
+// Cron: credit wallet top-ups that were paid but never confirmed by the app (every 5 min)
+cron.schedule('*/5 * * * *', async () => {
+  const { reconcileStaleOrders } = require('./src/controllers/walletController');
+  await reconcileStaleOrders();
 });
 
 // Cron: clear stale queued consultations every 10 minutes

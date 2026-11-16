@@ -4,7 +4,7 @@ import AgoraRTC from 'agora-rtc-sdk-ng'
 import api from '../../services/api'
 import toast from 'react-hot-toast'
 
-const AGORA_APP_ID = 'e2e9d562aa754dcca16a5219e557b133'
+const AGORA_APP_ID = 'cfc5ddec9cdd48f09a301aba96991a25'
 
 export default function CallScreen({ consultation, onEnd }) {
   const [muted, setMuted] = useState(false)

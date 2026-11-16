@@ -7,7 +7,7 @@ import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
 import 'chat_history_screen.dart';
 
-const String _agoraAppId = 'e2e9d562aa754dcca16a5219e557b133';
+const String _agoraAppId = 'cfc5ddec9cdd48f09a301aba96991a25';
 
 class CallScreen extends StatefulWidget {
   final Astrologer astrologer;
@@ -66,7 +66,7 @@ class _CallScreenState extends State<CallScreen> {
     try {
       final tokenData = await ApiService.getAgoraToken(channelName, uid: 2);
       final token = tokenData['data']?['token'] ?? tokenData['token'];
-      const appId = _agoraAppId;
+      final appId = (tokenData['app_id'] ?? tokenData['data']?['app_id'] ?? _agoraAppId) as String;
 
       _engine = createAgoraRtcEngine();
       await _engine!.initialize(RtcEngineContext(appId: appId));
@@ -79,9 +79,11 @@ class _CallScreenState extends State<CallScreen> {
           _engine?.setEnableSpeakerphone(_isSpeakerOn);
         },
         onUserJoined: (connection, remoteUid, elapsed) {
+          if (remoteUid >= 900000 && remoteUid < 901000) return; // transcription bots
           if (mounted) setState(() { _remoteUid = remoteUid; _remoteJoined = true; });
         },
         onUserOffline: (connection, remoteUid, reason) {
+          if (remoteUid >= 900000 && remoteUid < 901000) return; // transcription bots
           if (!mounted) return;
           setState(() { _remoteJoined = false; _isEnded = true; });
           if (!_dialogShown) _cleanup().then((_) => _showEndDialog({}));

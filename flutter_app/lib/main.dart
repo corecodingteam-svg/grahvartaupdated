@@ -146,7 +146,7 @@ class _AstroTalkAppState extends State<AstroTalkApp> {
       ],
       child: Consumer2<LocaleProvider, ThemeProvider>(
         builder: (_, localeProvider, themeProvider, __) => MaterialApp(
-          title: 'AstroVaak',
+          title: 'Grahvarta',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,

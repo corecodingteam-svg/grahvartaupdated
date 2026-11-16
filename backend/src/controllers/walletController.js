@@ -17,6 +17,39 @@ async function ensureWallet(userId) {
   return result.rows[0];
 }
 
+// TESTING ONLY: every end user gets a one-time ₹TEST_WALLET_CREDIT (default 1000).
+// Set TEST_WALLET_CREDIT=0 in the environment to switch it off. Existing users
+// were credited once by migration 030_test_wallet_credit.sql.
+async function grantTestCredit(userId) {
+  const amount = parseFloat(process.env.TEST_WALLET_CREDIT ?? '1000');
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('INSERT INTO wallets (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [userId]);
+    const w = await client.query('SELECT id, balance FROM wallets WHERE user_id = $1 FOR UPDATE', [userId]);
+    const already = await client.query(
+      "SELECT 1 FROM wallet_transactions WHERE user_id = $1 AND reference_type = 'test_credit' LIMIT 1", [userId]
+    );
+    if (!already.rows.length) {
+      const before = parseFloat(w.rows[0].balance || 0);
+      await client.query('UPDATE wallets SET balance = balance + $1, updated_at = NOW() WHERE user_id = $2', [amount, userId]);
+      await client.query(
+        `INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, balance_before, balance_after, description, reference_type, status)
+         VALUES ($1, $2, 'bonus', $3, $4, $5, 'Test wallet credit', 'test_credit', 'success')`,
+        [w.rows[0].id, userId, amount, before, before + amount]
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('grantTestCredit error:', err.message);
+  } finally {
+    client.release();
+  }
+}
+exports.grantTestCredit = grantTestCredit;
+
 exports.getWallet = async (req, res) => {
   try {
     const wallet = await ensureWallet(req.user.id);
@@ -75,6 +108,7 @@ exports.adminCreateOffer = async (req, res) => {
     );
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ success: false, message: 'An active offer for this amount already exists. Edit or disable it instead.' });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -91,6 +125,7 @@ exports.adminUpdateOffer = async (req, res) => {
     if (!result.rows.length) return res.status(404).json({ success: false, message: 'Offer not found' });
     res.json({ success: true, data: result.rows[0] });
   } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ success: false, message: 'Another active offer already uses this amount. Disable it first.' });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -161,52 +196,232 @@ exports.createAddMoneyOrder = async (req, res) => {
   }
 };
 
-// Verify and credit wallet after payment
-exports.verifyAndCredit = async (req, res) => {
+// ── Payment crediting ─────────────────────────────────────────────────────────
+// A wallet order is credited exactly once, by whichever path sees the payment
+// first: the app's verify call, the app's reconcile call, the Razorpay webhook
+// or the periodic reconciliation cron. This matters for wallet/redirect
+// payment methods (e.g. MobiKwik) where checkout reports success but the app's
+// success callback — and therefore the verify call — can be lost.
+
+const crypto = require('crypto');
+
+/** Atomically mark a pending order completed and credit the wallet. */
+async function creditOrder(orderId, { paymentId = null, method = null } = {}) {
+  const client = await db.pool.connect();
+  let credited = null;
   try {
-    const { order_id, payment_id, signature, amount } = req.body;
-
-    // Verify Razorpay signature
-    if (process.env.RAZORPAY_KEY_SECRET && signature !== 'demo_signature') {
-      const crypto = require('crypto');
-      const generated = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-        .update(`${order_id}|${payment_id}`).digest('hex');
-      if (generated !== signature) return res.status(400).json({ success: false, message: 'Invalid payment signature' });
-    }
-
-    // Resolve wallet_credit from server-stored order (prevents client tampering)
-    const orderRow = await db.query(
-      'SELECT wallet_credit, bonus_amount FROM wallet_orders WHERE order_id = $1 AND user_id = $2 AND status = $3',
-      [order_id, req.user.id, 'pending']
+    await client.query('BEGIN');
+    const o = await client.query(
+      `UPDATE wallet_orders
+         SET status = 'completed', payment_id = COALESCE($2, payment_id), method = COALESCE($3, method),
+             credited_at = NOW(), updated_at = NOW()
+       WHERE order_id = $1 AND status = 'pending'
+       RETURNING *`,
+      [orderId, paymentId, method]
     );
-    const creditAmount = orderRow.rows.length
-      ? parseFloat(orderRow.rows[0].wallet_credit)
-      : parseFloat(amount); // fallback for legacy calls
-    const bonusAmount = orderRow.rows.length ? parseFloat(orderRow.rows[0].bonus_amount) : 0;
+    if (!o.rows.length) { await client.query('ROLLBACK'); return null; } // unknown or already credited
+    const order = o.rows[0];
+    const userId = order.user_id;
+    const creditAmount = parseFloat(order.wallet_credit);
+    const bonusAmount = parseFloat(order.bonus_amount || 0);
 
-    const wallet = await ensureWallet(req.user.id);
-
-    await db.query('UPDATE wallets SET balance = balance + $1, total_added = total_added + $1 WHERE user_id = $2', [creditAmount, req.user.id]);
-    await db.query('UPDATE wallet_orders SET status = $1 WHERE order_id = $2', ['completed', order_id]);
+    await client.query('INSERT INTO wallets (user_id) VALUES ($1::uuid) ON CONFLICT (user_id) DO NOTHING', [userId]);
+    const w = await client.query('SELECT id, balance FROM wallets WHERE user_id = $1::uuid FOR UPDATE', [userId]);
+    const before = parseFloat(w.rows[0].balance || 0);
+    await client.query(
+      'UPDATE wallets SET balance = balance + $1, total_added = total_added + $1, updated_at = NOW() WHERE user_id = $2::uuid',
+      [creditAmount, userId]
+    );
 
     const baseAmount = creditAmount - bonusAmount;
     const description = bonusAmount > 0
       ? `Wallet recharge ₹${baseAmount.toFixed(0)} + ₹${bonusAmount.toFixed(0)} bonus`
       : 'Wallet recharge';
-
-    await db.query(`
-      INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, balance_before, balance_after, description, gateway_transaction_id, payment_gateway, status)
-      VALUES ($1, $2, 'credit', $3, $4, $5, $6, $7, 'razorpay', 'success')
-    `, [wallet.id, req.user.id, creditAmount, wallet.balance, wallet.balance + creditAmount, description, payment_id]);
-
-    const updated = await db.query('SELECT * FROM wallets WHERE user_id = $1', [req.user.id]);
-    const notifMsg = bonusAmount > 0
-      ? `₹${creditAmount} credited (includes ₹${bonusAmount} bonus)!`
-      : `₹${creditAmount} has been credited to your wallet.`;
-    sendPushNotification([req.user.id], '💰 Money Added!', notifMsg, { type: 'wallet_credit', amount: String(creditAmount) });
-    res.json({ success: true, data: updated.rows[0], message: `₹${creditAmount} added to wallet`, bonus_amount: bonusAmount });
+    await client.query(
+      `INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, balance_before, balance_after, description,
+                                        reference_id, reference_type, gateway_transaction_id, payment_gateway, status)
+       VALUES ($1, $2::uuid, 'credit', $3, $4, $5, $6, $7, 'wallet_order', $8, 'razorpay', 'success')`,
+      [w.rows[0].id, userId, creditAmount, before, before + creditAmount, description, orderId, order.payment_id]
+    );
+    await client.query('COMMIT');
+    credited = { userId, creditAmount, bonusAmount };
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const notifMsg = credited.bonusAmount > 0
+    ? `₹${credited.creditAmount} credited (includes ₹${credited.bonusAmount} bonus)!`
+    : `₹${credited.creditAmount} has been credited to your wallet.`;
+  sendPushNotification([credited.userId], '💰 Money Added!', notifMsg, { type: 'wallet_credit', amount: String(credited.creditAmount) })
+    .catch(() => {});
+  return credited;
+}
+
+/**
+ * Ask Razorpay whether an order has been paid. Captures an authorized-but-not-
+ * captured payment (accounts without auto-capture) and credits the wallet.
+ * Returns 'credited' | 'already' | 'unpaid' | 'unavailable'.
+ */
+async function reconcileOrder(orderId) {
+  if (!razorpay) return 'unavailable';
+  const order = await db.query('SELECT * FROM wallet_orders WHERE order_id = $1', [orderId]);
+  if (!order.rows.length) return 'unpaid';
+  if (order.rows[0].status === 'completed') return 'already';
+
+  const expectedPaise = Math.round(parseFloat(order.rows[0].amount_paid) * 1.18 * 100);
+  const { items = [] } = await razorpay.orders.fetchPayments(orderId);
+  let payment = items.find(p => p.status === 'captured');
+  if (!payment) {
+    const authorized = items.find(p => p.status === 'authorized');
+    if (authorized) {
+      try {
+        payment = await razorpay.payments.capture(authorized.id, authorized.amount, authorized.currency || 'INR');
+      } catch (e) {
+        console.error(`[wallet] capture failed for ${authorized.id}:`, e.error?.description || e.message);
+        return 'unpaid';
+      }
+    }
+  }
+  if (!payment || payment.status !== 'captured') return 'unpaid';
+  if (Math.abs(Number(payment.amount) - expectedPaise) > 1) {
+    console.error(`[wallet] amount mismatch on ${orderId}: paid ${payment.amount}, expected ${expectedPaise} — not crediting`);
+    return 'unpaid';
+  }
+  const result = await creditOrder(orderId, { paymentId: payment.id, method: payment.wallet || payment.method || null });
+  return result ? 'credited' : 'already';
+}
+exports.reconcileOrder = reconcileOrder;
+
+// Verify and credit wallet after the app's payment-success callback
+exports.verifyAndCredit = async (req, res) => {
+  try {
+    const { order_id, payment_id, signature } = req.body;
+    if (!order_id) return res.status(400).json({ success: false, message: 'order_id is required' });
+
+    const orderRow = await db.query('SELECT * FROM wallet_orders WHERE order_id = $1 AND user_id = $2', [order_id, req.user.id]);
+    if (!orderRow.rows.length) return res.status(404).json({ success: false, message: 'Order not found' });
+    const order = orderRow.rows[0];
+
+    let outcome;
+    if (order.status === 'completed') {
+      outcome = 'already';
+    } else if (!razorpay) {
+      // Dev mode only (no gateway configured): demo orders are credited directly
+      outcome = (await creditOrder(order_id, { paymentId: payment_id || null, method: 'demo' })) ? 'credited' : 'already';
+    } else {
+      const validSignature = !!(signature && payment_id && process.env.RAZORPAY_KEY_SECRET) &&
+        crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET).update(`${order_id}|${payment_id}`).digest('hex') === signature;
+      outcome = validSignature
+        ? ((await creditOrder(order_id, { paymentId: payment_id })) ? 'credited' : 'already')
+        : await reconcileOrder(order_id); // no/invalid signature: trust only Razorpay's own record
+    }
+
+    if (outcome !== 'credited' && outcome !== 'already') {
+      return res.status(400).json({ success: false, message: 'Payment not confirmed yet. If money was deducted it will be added automatically within a few minutes.' });
+    }
+    const updated = await db.query('SELECT * FROM wallets WHERE user_id = $1', [req.user.id]);
+    const credit = parseFloat(order.wallet_credit);
+    res.json({
+      success: true,
+      data: updated.rows[0],
+      message: `₹${credit} added to wallet`,
+      bonus_amount: parseFloat(order.bonus_amount || 0),
+      already_credited: outcome === 'already',
+    });
+  } catch (err) {
+    console.error('verifyAndCredit error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// App: check the caller's recent pending top-ups against Razorpay and credit
+// any that were actually paid. Called when the wallet screen opens/resumes and
+// after every checkout outcome (success, error or external wallet).
+exports.reconcilePending = async (req, res) => {
+  try {
+    const { order_id } = req.body || {};
+    const pending = await db.query(
+      `SELECT order_id FROM wallet_orders
+       WHERE user_id = $1 AND status = 'pending' AND created_at > NOW() - INTERVAL '3 days'
+         AND ($2::text IS NULL OR order_id = $2)
+       ORDER BY created_at DESC LIMIT 10`,
+      [req.user.id, order_id || null]
+    );
+    const credited = [];
+    for (const row of pending.rows) {
+      try {
+        if ((await reconcileOrder(row.order_id)) === 'credited') credited.push(row.order_id);
+      } catch (e) {
+        console.error(`[wallet] reconcile ${row.order_id} failed:`, e.error?.description || e.message);
+      }
+    }
+    const wallet = await ensureWallet(req.user.id);
+    res.json({ success: true, data: { wallet, credited_orders: credited } });
+  } catch (err) {
+    console.error('reconcilePending error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Razorpay webhook (configure in Razorpay dashboard → Webhooks:
+//   URL  https://api.grahvarta.com/api/wallet/razorpay-webhook
+//   events: payment.captured, order.paid
+//   secret: same value as RAZORPAY_WEBHOOK_SECRET)
+// Mounted with express.raw() in server.js so the signature is computed on the raw body.
+exports.razorpayWebhook = async (req, res) => {
+  try {
+    const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    if (!secret) return res.status(503).json({ success: false, message: 'Webhook not configured' });
+    const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body || {}));
+    const expected = crypto.createHmac('sha256', secret).update(raw).digest('hex');
+    const given = String(req.headers['x-razorpay-signature'] || '');
+    if (given.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected))) {
+      return res.status(400).json({ success: false, message: 'Invalid signature' });
+    }
+    const event = JSON.parse(raw.toString('utf8'));
+    const payment = event.payload?.payment?.entity;
+    const orderId = payment?.order_id || event.payload?.order?.entity?.id;
+    if (orderId && (event.event === 'payment.captured' || event.event === 'order.paid')) {
+      const order = await db.query('SELECT amount_paid FROM wallet_orders WHERE order_id = $1', [orderId]);
+      if (order.rows.length) {
+        const expectedPaise = Math.round(parseFloat(order.rows[0].amount_paid) * 1.18 * 100);
+        if (payment && Math.abs(Number(payment.amount) - expectedPaise) > 1) {
+          console.error(`[wallet] webhook amount mismatch on ${orderId}`);
+        } else {
+          await creditOrder(orderId, { paymentId: payment?.id || null, method: payment?.wallet || payment?.method || null });
+        }
+      }
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('razorpayWebhook error:', err);
+    res.status(500).json({ success: false });
+  }
+};
+
+// Cron: credit any top-ups paid in the last 24h that no client path reported
+exports.reconcileStaleOrders = async () => {
+  if (!razorpay) return;
+  try {
+    const pending = await db.query(
+      `SELECT order_id FROM wallet_orders
+       WHERE status = 'pending' AND order_id NOT LIKE 'order_demo_%'
+         AND created_at BETWEEN NOW() - INTERVAL '24 hours' AND NOW() - INTERVAL '2 minutes'
+       ORDER BY created_at DESC LIMIT 50`
+    );
+    for (const row of pending.rows) {
+      try {
+        const r = await reconcileOrder(row.order_id);
+        if (r === 'credited') console.log(`[wallet] reconciled & credited ${row.order_id}`);
+      } catch (e) {
+        console.error(`[wallet] cron reconcile ${row.order_id}:`, e.error?.description || e.message);
+      }
+    }
+  } catch (err) {
+    console.error('[wallet] reconcileStaleOrders error:', err.message);
   }
 };
 

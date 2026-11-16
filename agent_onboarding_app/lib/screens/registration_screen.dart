@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -5,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme.dart';
 import '../api_service.dart';
+import '../device_id.dart';
 import 'dashboard_screen.dart';
 
 const List<String> _languages = [
@@ -32,7 +34,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   int _currentStep = 0;
   bool _submitting = false;
 
-  // Step 1
+  // Step 1 — contact (verified) + personal
+  late final TextEditingController _phoneCtrl;
+  final _emailCtrl = TextEditingController();
+  final _otpCtrl = TextEditingController();
+  bool _otpSent = false;
+  bool _sendingOtp = false;
+  bool _verifyingOtp = false;
+  String? _verificationToken; // set once the email OTP is verified
+  String? _verifiedFor;       // "<phone>|<email>" the token was issued for
+  int _resendIn = 0;
+  Timer? _resendTimer;
+  String? _deviceId;
   final _nameCtrl = TextEditingController();
   DateTime? _dob;
   String _gender = '';
@@ -44,14 +57,92 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   // Step 3
   File? _profilePhoto;
   String _phoneType = '';
-  final _emailCtrl = TextEditingController();
   final _aboutCtrl = TextEditingController();
+  final _platformsCtrl = TextEditingController();
   bool _worksOnline = false;
   int _hours = 4;
+
+  static final _emailRe = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$');
+  String get _phone => '+91${_phoneCtrl.text.trim()}';
+  String get _email => _emailCtrl.text.trim().toLowerCase();
+  bool get _isVerified => _verificationToken != null && _verifiedFor == '$_phone|$_email';
+
+  @override
+  void initState() {
+    super.initState();
+    _phoneCtrl = TextEditingController(text: widget.phone.replaceFirst('+91', ''));
+    DeviceId.get().then((id) => _deviceId = id);
+  }
+
+  String? _contactError() {
+    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(_phoneCtrl.text.trim())) return 'Enter a valid 10-digit mobile number';
+    if (!_emailRe.hasMatch(_email)) return 'Enter a valid email address';
+    return null;
+  }
+
+  Future<void> _sendOtp() async {
+    final err = _contactError();
+    if (err != null) { _showError(err); return; }
+    setState(() => _sendingOtp = true);
+    try {
+      _deviceId ??= await DeviceId.get();
+      await ApiService.sendEmailOtp(email: _email, phone: _phone, deviceId: _deviceId!);
+      if (!mounted) return;
+      _otpCtrl.clear();
+      setState(() { _otpSent = true; _verificationToken = null; });
+      _startResendTimer();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('A 5-digit code was sent to $_email'),
+        backgroundColor: AppColors.success,
+      ));
+    } catch (e) {
+      if (mounted) _showError(e.toString());
+    } finally {
+      if (mounted) setState(() => _sendingOtp = false);
+    }
+  }
+
+  void _startResendTimer() {
+    _resendTimer?.cancel();
+    setState(() => _resendIn = 60);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) { t.cancel(); return; }
+      setState(() => _resendIn--);
+      if (_resendIn <= 0) t.cancel();
+    });
+  }
+
+  Future<void> _verifyOtp() async {
+    final otp = _otpCtrl.text.trim();
+    if (!RegExp(r'^\d{5}$').hasMatch(otp)) { _showError('Enter the 5-digit code'); return; }
+    setState(() => _verifyingOtp = true);
+    try {
+      final token = await ApiService.verifyEmailOtp(email: _email, otp: otp);
+      if (!mounted) return;
+      setState(() { _verificationToken = token; _verifiedFor = '$_phone|$_email'; });
+      FocusScope.of(context).unfocus();
+    } catch (e) {
+      if (mounted) _showError(e.toString());
+    } finally {
+      if (mounted) setState(() => _verifyingOtp = false);
+    }
+  }
+
+  /// Editing the number or email after verifying invalidates the verification.
+  void _onContactChanged(String _) {
+    if (_verificationToken != null && !_isVerified) {
+      setState(() { _verificationToken = null; _otpSent = false; _otpCtrl.clear(); });
+    } else {
+      setState(() {});
+    }
+  }
 
   bool _validateStep() {
     switch (_currentStep) {
       case 0:
+        final err = _contactError();
+        if (err != null) { _showError(err); return false; }
+        if (!_isVerified) { _showError(_otpSent ? 'Enter the code sent to your email and tap Verify' : 'Verify your email to continue'); return false; }
         if (_nameCtrl.text.trim().isEmpty) { _showError('Please enter your name'); return false; }
         if (_dob == null) { _showError('Please select date of birth'); return false; }
         if (_gender.isEmpty) { _showError('Please select gender'); return false; }
@@ -63,8 +154,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       case 2:
         if (_profilePhoto == null) { _showError('Please upload a profile photo'); return false; }
         if (_phoneType.isEmpty) { _showError('Select your phone type'); return false; }
-        if (_emailCtrl.text.trim().isEmpty || !_emailCtrl.text.contains('@')) {
-          _showError('Enter a valid email address'); return false;
+        if (_worksOnline && _platformsCtrl.text.trim().isEmpty) {
+          _showError('Enter the online platforms you work on'); return false;
         }
         if (_aboutCtrl.text.trim().isEmpty) {
           _showError('Please fill in About Me'); return false;
@@ -184,8 +275,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (_profilePhoto != null) {
         photoUrl = await ApiService.uploadPhoto(_profilePhoto!);
       }
+      final phone = _phone;
       final result = await ApiService.submitApplication({
-        'phone': widget.phone,
+        'phone': phone,
         'name': _nameCtrl.text.trim(),
         'dob': _dob != null ? DateFormat('yyyy-MM-dd').format(_dob!) : null,
         'gender': _gender,
@@ -193,17 +285,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         'skills': _selectedSkills.toList(),
         'profile_picture_url': photoUrl,
         'phone_type': _phoneType,
-        'email': _emailCtrl.text.trim(),
+        'email': _email,
+        'email_verification_token': _verificationToken,
+        'device_id': _deviceId ?? await DeviceId.get(),
+        'device_platform': DeviceId.platform,
         'works_online': _worksOnline,
+        'online_platforms': _worksOnline ? _platformsCtrl.text.trim() : null,
         'hours_available': _hours,
         'about_me': _aboutCtrl.text.trim(),
       });
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('agent_phone', widget.phone);
+      await prefs.setString('agent_phone', phone);
       await prefs.setString('agent_name', _nameCtrl.text.trim());
       await prefs.setString('agent_token', result['token_no'] as String? ?? '');
       if (mounted) {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DashboardScreen(phone: widget.phone)));
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DashboardScreen(phone: phone)));
       }
     } catch (e) {
       if (mounted) { setState(() => _submitting = false); _showError(e.toString()); }
@@ -212,10 +308,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     _pageController.dispose();
+    _phoneCtrl.dispose();
+    _otpCtrl.dispose();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _aboutCtrl.dispose();
+    _platformsCtrl.dispose();
     super.dispose();
   }
 
@@ -239,9 +339,116 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
+  Widget _buildContactSection() {
+    final verified = _isVerified;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionTitle('Contact Details'),
+      const SizedBox(height: 4),
+      const Text('We will email you a 5-digit code to verify your address', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+      const SizedBox(height: 16),
+      TextField(
+        controller: _phoneCtrl,
+        keyboardType: TextInputType.phone,
+        maxLength: 10,
+        enabled: !_sendingOtp && !_verifyingOtp,
+        onChanged: _onContactChanged,
+        decoration: const InputDecoration(
+          labelText: 'Mobile Number *',
+          prefixText: '+91  ',
+          prefixIcon: Icon(Icons.phone_android_outlined),
+          counterText: '',
+        ),
+      ),
+      const SizedBox(height: 16),
+      TextField(
+        controller: _emailCtrl,
+        keyboardType: TextInputType.emailAddress,
+        autocorrect: false,
+        enabled: !_sendingOtp && !_verifyingOtp,
+        onChanged: _onContactChanged,
+        decoration: InputDecoration(
+          labelText: 'Email Address *',
+          prefixIcon: const Icon(Icons.email_outlined),
+          suffixIcon: verified ? const Icon(Icons.verified, color: AppColors.success) : null,
+        ),
+      ),
+      const SizedBox(height: 12),
+      if (verified)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.success.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.success.withValues(alpha: 0.4)),
+          ),
+          child: const Row(children: [
+            Icon(Icons.check_circle, color: AppColors.success, size: 20),
+            SizedBox(width: 10),
+            Expanded(child: Text('Email verified', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w600))),
+          ]),
+        )
+      else ...[
+        if (_otpSent) ...[
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: TextField(
+                controller: _otpCtrl,
+                keyboardType: TextInputType.number,
+                maxLength: 5,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 20, letterSpacing: 10, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                onChanged: (v) { if (v.length == 5) _verifyOtp(); },
+                decoration: const InputDecoration(hintText: '•••••', counterText: ''),
+              ),
+            ),
+            const SizedBox(width: 10),
+            SizedBox(
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _verifyingOtp ? null : _verifyOtp,
+                style: ElevatedButton.styleFrom(minimumSize: const Size(96, 52)),
+                child: _verifyingOtp
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Verify'),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 6),
+        ],
+        Align(
+          alignment: Alignment.centerRight,
+          child: _otpSent
+              ? TextButton(
+                  onPressed: (_resendIn > 0 || _sendingOtp) ? null : _sendOtp,
+                  child: Text(_sendingOtp ? 'Sending…' : _resendIn > 0 ? 'Resend code in ${_resendIn}s' : 'Resend code'),
+                )
+              : SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _sendingOtp ? null : _sendOtp,
+                    icon: _sendingOtp
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
+                        : const Icon(Icons.mark_email_read_outlined),
+                    label: Text(_sendingOtp ? 'Sending code…' : 'Send verification code'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                      side: const BorderSide(color: AppColors.primary),
+                      foregroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    ]);
+  }
+
   Widget _buildStep1() => SingleChildScrollView(
     padding: const EdgeInsets.all(20),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _buildContactSection(),
+      const SizedBox(height: 28),
       _sectionTitle('Personal Information'),
       const SizedBox(height: 20),
       TextField(controller: _nameCtrl, decoration: InputDecoration(labelText: 'Full Name *', prefixIcon: Icon(Icons.person_outline))),
@@ -380,10 +587,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       ]),
       const SizedBox(height: 20),
 
-      // Email
-      TextField(controller: _emailCtrl, keyboardType: TextInputType.emailAddress, decoration: InputDecoration(labelText: 'Email Address *', prefixIcon: Icon(Icons.email_outlined))),
-      const SizedBox(height: 20),
-
       // About Me
       const Text('About Me *', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
       const SizedBox(height: 6),
@@ -416,6 +619,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           activeThumbColor: AppColors.primary,
         ),
       ),
+      if (_worksOnline) ...[
+        const SizedBox(height: 12),
+        TextField(
+          controller: _platformsCtrl,
+          maxLength: 200,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            labelText: 'Which platforms? *',
+            hintText: 'e.g. AstroTalk, AstroSage, Instagram',
+            prefixIcon: Icon(Icons.public),
+            counterText: '',
+          ),
+        ),
+      ],
       const SizedBox(height: 20),
 
       // Hours

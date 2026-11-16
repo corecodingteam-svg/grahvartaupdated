@@ -5,7 +5,7 @@ import { api } from '../lib/api'
 // Same Agora App ID the Flutter app uses (flutter_app/lib/screens/consultation/call_screen.dart) —
 // App IDs are public identifiers, not secrets; the App Certificate that
 // actually signs tokens stays server-side (backend/src/routes/agora.js).
-const AGORA_APP_ID = 'e2e9d562aa754dcca16a5219e557b133'
+const AGORA_APP_ID = 'cfc5ddec9cdd48f09a301aba96991a25' // fallback; the token response's app_id wins
 
 // Joins the Agora channel once a consultation is active, using the
 // consultation ID as the channel name — same convention as the Flutter app.
@@ -52,7 +52,7 @@ export function useAgoraCall({ consultationId, active, withVideo = false }) {
           if (mediaType === 'video') setRemoteVideoTrack(null)
         })
 
-        await client.join(AGORA_APP_ID, consultationId, res.token || null, uid)
+        await client.join(res.app_id || AGORA_APP_ID, consultationId, res.token || null, uid)
         if (cancelled) {
           await client.leave()
           return
