@@ -103,6 +103,19 @@ class _AstrologerDashboardView extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Online + chat / voice / video switches, right on the dashboard
+                        if (astrologer != null)
+                          Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 20),
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                            decoration: BoxDecoration(
+                              color: context.clr.card,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: context.clr.border),
+                            ),
+                            child: const AvailabilityPanel(),
+                          ),
                         _buildStats(context, astrologer, state.data),
                         const SizedBox(height: 20),
                         _buildRecentConsultations(context, state.data),
