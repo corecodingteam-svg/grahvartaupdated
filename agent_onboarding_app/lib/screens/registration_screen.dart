@@ -48,7 +48,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   // Step 3
   File? _profilePhoto;
-  String _phoneType = '';
   final _aboutCtrl = TextEditingController();
   final _platformsCtrl = TextEditingController();
   bool _worksOnline = false;
@@ -76,7 +75,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         return true;
       case 2:
         if (_profilePhoto == null) { _showError('Please upload a profile photo'); return false; }
-        if (_phoneType.isEmpty) { _showError('Select your phone type'); return false; }
         if (_worksOnline && _platformsCtrl.text.trim().isEmpty) {
           _showError('Enter the online platforms you work on'); return false;
         }
@@ -207,7 +205,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         'languages': _selectedLanguages.toList(),
         'skills': _selectedSkills.toList(),
         'profile_picture_url': photoUrl,
-        'phone_type': _phoneType,
+        'phone_type': DeviceId.platform, // detected, not asked
         'email': _email,
         'email_verification_token': widget.verificationToken,
         'device_id': _deviceId ?? await DeviceId.get(),
@@ -413,16 +411,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       ),
       const SizedBox(height: 24),
 
-      // Phone type
-      const Text('What phone do you use? *', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-      const SizedBox(height: 10),
-      Row(children: [
-        _PhoneTypeCard(type: 'android', icon: Icons.android, label: 'Android', selected: _phoneType == 'android', onTap: () => setState(() => _phoneType = 'android')),
-        const SizedBox(width: 12),
-        _PhoneTypeCard(type: 'ios', icon: Icons.phone_iphone, label: 'iPhone (iOS)', selected: _phoneType == 'ios', onTap: () => setState(() => _phoneType = 'ios')),
-      ]),
-      const SizedBox(height: 20),
-
       // About Me
       const Text('About Me *', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
       const SizedBox(height: 6),
@@ -582,34 +570,6 @@ class _RadioChip extends StatelessWidget {
         border: Border.all(color: selected ? AppColors.primary : AppColors.border),
       ),
       child: Text(label, style: TextStyle(color: selected ? Colors.white : AppColors.textSecondary, fontWeight: FontWeight.w500)),
-    ),
-  );
-}
-
-class _PhoneTypeCard extends StatelessWidget {
-  final String type, label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-  const _PhoneTypeCard({required this.type, required this.icon, required this.label, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary.withValues(alpha: 0.15) : AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: selected ? 2 : 1),
-        ),
-        child: Column(children: [
-          Icon(icon, size: 32, color: selected ? AppColors.primary : AppColors.textMuted),
-          const SizedBox(height: 6),
-          Text(label, style: TextStyle(color: selected ? AppColors.primary : AppColors.textSecondary, fontWeight: selected ? FontWeight.w600 : FontWeight.normal, fontSize: 13), textAlign: TextAlign.center),
-        ]),
-      ),
     ),
   );
 }
