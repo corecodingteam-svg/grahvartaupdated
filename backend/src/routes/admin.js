@@ -25,6 +25,31 @@ const requireSuperAdmin = (req, res, next) => {
   res.status(403).json({ success: false, message: 'Superadmin access required' });
 };
 
+// Sub-admins may only use the sections they were granted (the admin panel
+// hides other menus, but the API itself must refuse them too). Superadmins
+// pass everything. Keys match admin-portal SubadminsPage PERMISSIONS.
+const SECTION_PERMISSIONS = [
+  ['/dashboard', 'dashboard'],
+  ['/users', 'users'],
+  ['/astrologers', 'astrologers'],
+  ['/withdrawals', 'withdrawals'],
+  ['/reports', 'reports'],
+  ['/transactions', 'transactions'],
+  ['/wallet', 'transactions'],
+  ['/community', 'community'],
+  ['/notifications', 'notifications'],
+  ['/hirings', 'hirings'],
+  ['/recharge-offers', 'recharge_offers'],
+  ['/moderation', 'moderation'],
+];
+router.use((req, res, next) => {
+  if (req.admin?.isSuperAdmin) return next();
+  const section = SECTION_PERMISSIONS.find(([prefix]) => req.path === prefix || req.path.startsWith(prefix + '/'));
+  if (!section) return next(); // superadmin-only routes are guarded separately below
+  if (Array.isArray(req.admin?.permissions) && req.admin.permissions.includes(section[1])) return next();
+  return res.status(403).json({ success: false, message: 'You do not have permission for this section' });
+});
+
 // Dashboard
 router.get('/dashboard', ctrl.getDashboardStats);
 

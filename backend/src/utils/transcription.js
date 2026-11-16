@@ -54,7 +54,19 @@ async function start(consultationId) {
   try {
     const { data } = await axios.post(`${BASE}/join`, body, { headers: authHeader(), timeout: 15000 });
     const agentId = data.agent_id || data.agentId;
-    if (agentId) await db.query('UPDATE consultations SET stt_agent_id = $1 WHERE id = $2', [agentId, consultationId]);
+    if (agentId) {
+      // The call may have ended while Agora was still starting the agent; in
+      // that case stop() found nothing to stop, so stop the agent right here.
+      const r = await db.query(
+        `UPDATE consultations SET stt_agent_id = $1 WHERE id = $2 RETURNING status`,
+        [agentId, consultationId]
+      );
+      if (!r.rows.length || r.rows[0].status !== 'active') {
+        console.log(`[stt] call ${consultationId} already ended — stopping agent ${agentId}`);
+        await stop(consultationId);
+        return null;
+      }
+    }
     console.log(`[stt] started for consultation ${consultationId} (agent ${agentId})`);
     return agentId;
   } catch (err) {

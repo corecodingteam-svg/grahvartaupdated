@@ -2,7 +2,9 @@ const db = require('../config/database');
 const axios = require('axios');
 const { sendPushNotification } = require('./liveController');
 
-const GEMINI_API_KEY = 'AIzaSyDEttTAsBBMvNivPbs8YPOCo-rInvQ5oyU';
+// Set in backend/.env — never commit API keys
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) console.warn('[reports] GEMINI_API_KEY is not set — report generation will fail');
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 const REPORT_PLANS = [

@@ -13,7 +13,11 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401 || err.response?.status === 403) {
+    // Log out only when the session itself is invalid. A 403 for a section a
+    // sub-admin isn't permitted to use should just show an error.
+    const status = err.response?.status;
+    const sessionInvalid = status === 401 || (status === 403 && err.response?.data?.message === 'Admin access required');
+    if (sessionInvalid) {
       localStorage.removeItem('admin_token');
       window.location.href = '/admin/login';
     }

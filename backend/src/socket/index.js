@@ -289,17 +289,38 @@ function initSocket(io) {
       }
     });
 
+    // ─── AUTHORIZATION: is this socket's user a party to the consultation? ──
+    // Returns 'user' | 'astrologer' | null. Every consultation event below is
+    // checked with it, so nobody can join, read, accept, end or post into a
+    // session that isn't theirs.
+    const partyCache = new Map();
+    const partyOf = async (consultationId) => {
+      if (!consultationId || typeof consultationId !== 'string') return null;
+      if (partyCache.has(consultationId)) return partyCache.get(consultationId);
+      const r = await db.query(
+        `SELECT c.user_id, a.user_id AS astro_user_id FROM consultations c
+         JOIN astrologers a ON a.id = c.astrologer_id WHERE c.id = $1`,
+        [consultationId]
+      ).catch(() => ({ rows: [] }));
+      const row = r.rows[0];
+      const party = !row ? null : row.astro_user_id === userId ? 'astrologer' : row.user_id === userId ? 'user' : null;
+      if (party) partyCache.set(consultationId, party);
+      return party;
+    };
+    const inRoom = (consultationId) => socket.rooms.has(`consultation:${consultationId}`);
+
     // ─── ASTROLOGER ACCEPTS ──────────────────────────────────────
     socket.on('accept_consultation', async ({ consultation_id }) => {
       try {
-        const consult = await db.query('SELECT * FROM consultations WHERE id = $1', [consultation_id]);
-        if (!consult.rows.length) return;
-
+        if ((await partyOf(consultation_id)) !== 'astrologer') return;
         const now = new Date();
-        await db.query(
-          `UPDATE consultations SET status='active', started_at=$1 WHERE id=$2`,
+        // Only a still-queued request can be accepted (also prevents a double
+        // accept from starting two billing engines)
+        const consult = await db.query(
+          `UPDATE consultations SET status='active', started_at=$1 WHERE id=$2 AND status='queued' RETURNING *`,
           [now, consultation_id]
         );
+        if (!consult.rows.length) return;
 
         await db.query(`UPDATE consultation_queue SET status='called' WHERE consultation_id=$1`, [consultation_id]);
 
@@ -343,27 +364,36 @@ function initSocket(io) {
 
     // ─── JOIN EXISTING CONSULTATION ROOM (astrologer portal chat) ──
     socket.on('join_consultation', async ({ consultation_id }) => {
-      const consult = await db.query(
-        'SELECT * FROM consultations WHERE id = $1',
-        [consultation_id]
-      );
-      if (consult.rows.length) socket.join(`consultation:${consultation_id}`);
+      if (await partyOf(consultation_id)) socket.join(`consultation:${consultation_id}`);
     });
 
     // ─── REJECT / DECLINE ────────────────────────────────────────
     socket.on('reject_consultation', async ({ consultation_id }) => {
-      await db.query(`UPDATE consultations SET status='cancelled' WHERE id=$1`, [consultation_id]);
+      if (!(await partyOf(consultation_id))) return;
+      const r = await db.query(
+        `UPDATE consultations SET status='cancelled', ended_at=NOW() WHERE id=$1 AND status='queued' RETURNING astrologer_id`,
+        [consultation_id]
+      );
+      if (!r.rows.length) return;
+      await db.query(`UPDATE consultation_queue SET status='cancelled' WHERE consultation_id=$1`, [consultation_id]).catch(() => {});
+      await db.query('UPDATE astrologers SET queue_count = GREATEST(queue_count - 1, 0) WHERE id = $1', [r.rows[0].astrologer_id]).catch(() => {});
       io.to(`consultation:${consultation_id}`).emit('consultation_rejected', { consultation_id });
     });
 
     // ─── CHAT MESSAGES ───────────────────────────────────────────
     socket.on('send_message', async ({ consultation_id, content, message_type = 'text', media_url }) => {
       try {
+        // Sender role comes from the consultation itself, never from the client
+        const party = await partyOf(consultation_id);
+        if (!party) return;
+        if (typeof content !== 'string' || !content.trim() || content.length > 5000) return;
+        if (!['text', 'image'].includes(message_type)) return;
+
         // Reset inactivity timer
         const engine = billingEngines.get(consultation_id);
         if (engine) engine.resetActivity();
 
-        const senderRole = socket.role === 'astrologer' ? 'astrologer' : 'user';
+        const senderRole = party;
         const room = activeRooms.get(consultation_id);
 
         // Sharing phone numbers / email addresses is not allowed — block and record it
@@ -413,9 +443,11 @@ function initSocket(io) {
 
     // ─── TYPING INDICATORS ──────────────────────────────────────
     socket.on('typing_start', ({ consultation_id }) => {
+      if (!inRoom(consultation_id)) return;
       socket.to(`consultation:${consultation_id}`).emit('peer_typing', { is_typing: true });
     });
     socket.on('typing_stop', ({ consultation_id }) => {
+      if (!inRoom(consultation_id)) return;
       socket.to(`consultation:${consultation_id}`).emit('peer_typing', { is_typing: false });
     });
 
@@ -437,8 +469,11 @@ function initSocket(io) {
         for (const seg of segments.slice(0, 50)) {
           const text = String(seg?.text || '').trim();
           if (!text) continue;
-          const uid = Number.isFinite(Number(seg.uid)) ? Number(seg.uid) : null;
-          const startMs = Number.isFinite(Number(seg.start_ms)) ? Math.trunc(Number(seg.start_ms)) : null;
+          // NB: Number(null) === 0 — keep missing values as NULL, otherwise every
+          // sentence gets start_ms 0 and the de-dup index drops all but the first.
+          const num = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v))) ? null : Math.trunc(Number(v));
+          const uid = num(seg.uid);
+          const startMs = num(seg.start_ms);
           const r = await db.query(
             `INSERT INTO consultation_transcripts (consultation_id, speaker_role, speaker_uid, text, language, start_ms)
              VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING`,
@@ -454,20 +489,24 @@ function initSocket(io) {
 
     // ─── WEBRTC SIGNALING ────────────────────────────────────────
     socket.on('webrtc_offer', ({ consultation_id, sdp }) => {
+      if (!inRoom(consultation_id)) return;
       billingEngines.get(consultation_id)?.resetActivity();
       socket.to(`consultation:${consultation_id}`).emit('webrtc_offer', { sdp, from: userId });
     });
     socket.on('webrtc_answer', ({ consultation_id, sdp }) => {
+      if (!inRoom(consultation_id)) return;
       billingEngines.get(consultation_id)?.resetActivity();
       socket.to(`consultation:${consultation_id}`).emit('webrtc_answer', { sdp, from: userId });
     });
     socket.on('webrtc_ice_candidate', ({ consultation_id, candidate }) => {
+      if (!inRoom(consultation_id)) return;
       billingEngines.get(consultation_id)?.resetActivity();
       socket.to(`consultation:${consultation_id}`).emit('webrtc_ice_candidate', { candidate, from: userId });
     });
 
     // ─── END CONSULTATION ────────────────────────────────────────
     socket.on('end_consultation', async ({ consultation_id }) => {
+      if (!(await partyOf(consultation_id))) return;
       transcription.stop(consultation_id).catch(() => {});
       const engine = billingEngines.get(consultation_id);
       if (engine) {

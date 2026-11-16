@@ -8,7 +8,11 @@ const { pool } = require('../src/config/database');
 require('dotenv').config();
 
 const email    = process.env.ADMIN_EMAIL    || 'admin@grahvarta.com';
-const password = process.env.ADMIN_PASSWORD || 'Admin@1234';
+const password = process.env.ADMIN_PASSWORD;
+if (!password || password.length < 12) {
+  console.error('Set ADMIN_PASSWORD (at least 12 characters). No default password is used.');
+  process.exit(1);
+}
 const name     = process.env.ADMIN_NAME     || 'Super Admin';
 
 async function main() {
@@ -24,7 +28,6 @@ async function main() {
 
   console.log('✓ Admin user ready');
   console.log('  Email:   ', email);
-  console.log('  Password:', password);
   console.log('  ⚠  Change the password after first login!');
   await pool.end();
 }

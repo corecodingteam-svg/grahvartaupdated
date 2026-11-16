@@ -2,6 +2,18 @@ const router = require('express').Router();
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const IMAGE_EXT = /^\.(jpe?g|png|gif|webp|heic|heif)$/i;
+const safeImageExt = (file) => {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  if (IMAGE_EXT.test(ext)) return ext;
+  const fromMime = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp', 'image/heic': '.heic', 'image/heif': '.heif' }[file.mimetype];
+  return fromMime || '.jpg';
+};
+// Images only (SVG excluded — it can carry script). Some Android pickers send
+// application/octet-stream, which is accepted only with an image extension.
+const isAllowedImage = (file) =>
+  (/^image\/(jpeg|png|gif|webp|heic|heif)$/.test(file.mimetype)) ||
+  (file.mimetype === 'application/octet-stream' && IMAGE_EXT.test(path.extname(file.originalname || '')));
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const { authenticate } = require('../middleware/auth');
@@ -12,11 +24,11 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 const chatUpload = multer({
   storage: multer.diskStorage({
     destination: (_, __, cb) => cb(null, uploadDir),
-    filename: (_, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`),
+    filename: (_, file, cb) => cb(null, `${uuidv4()}${safeImageExt(file)}`),
   }),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_, file, cb) => {
-    if (/image/.test(file.mimetype) || file.mimetype === 'application/octet-stream') cb(null, true);
+    if (isAllowedImage(file)) cb(null, true);
     else cb(new Error('Only images are allowed'));
   },
 });

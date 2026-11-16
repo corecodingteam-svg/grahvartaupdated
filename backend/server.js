@@ -34,15 +34,44 @@ const corsOptions = {
   },
   credentials: true,
 };
+// Behind exactly one reverse proxy (nginx) — use the real client IP from
+// X-Forwarded-For. Without this every visitor shares nginx's IP, so the rate
+// limiter below would throttle the whole site as if it were one person.
+app.set('trust proxy', 1);
 app.use(helmet({ crossOriginEmbedderPolicy: false }));
 app.use(cors(corsOptions));
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 200 }));
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 600, standardHeaders: true, legacyHeaders: false }));
+
+// Brute-force protection for credentials and one-time codes (per client IP)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false,
+  skipSuccessfulRequests: true, // only failed attempts count
+  message: { success: false, message: 'Too many attempts. Please wait 15 minutes and try again.' },
+});
+const otpLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false,
+  message: { success: false, message: 'Too many verification requests. Please try again in an hour.' },
+});
+app.use(['/api/auth/login', '/api/auth/register', '/api/admin/login', '/api/auth/change-password'], authLimiter);
+app.use(['/api/hirings/send-otp', '/api/hirings/verify-otp'], otpLimiter);
 app.use(morgan('dev'));
 // Razorpay webhook needs the raw body for signature verification — must be before express.json()
 app.post('/api/wallet/razorpay-webhook', express.raw({ type: '*/*', limit: '1mb' }), require('./src/controllers/walletController').razorpayWebhook);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', require('express').static(require('path').join(__dirname, 'uploads')));
+// User uploads: never let an uploaded file run as a web page on this domain.
+// Only known image/PDF types are shown inline; everything else downloads,
+// and a locked-down CSP blocks scripts even inside SVGs.
+const INLINE_UPLOAD = /\.(jpe?g|png|gif|webp|heic|heif|pdf)$/i;
+app.use('/uploads', require('express').static(require('path').join(__dirname, 'uploads'), {
+  dotfiles: 'deny',
+  index: false,
+  setHeaders: (res, filePath) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox");
+    if (!INLINE_UPLOAD.test(filePath)) res.setHeader('Content-Disposition', 'attachment');
+  },
+}));
 
 // Attach io to req for use in controllers
 app.use((req, _, next) => { req.io = io; next(); });

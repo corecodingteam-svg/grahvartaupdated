@@ -28,11 +28,6 @@ CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_astrologers_status ON astrologers(status);
 
--- Seed default admin (change password after first login)
-INSERT INTO users (email, password_hash, name, role)
-VALUES (
-  'admin@astrovaak.com',
-  '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
-  'Super Admin',
-  'admin'
-) ON CONFLICT (email) DO UPDATE SET role = 'admin';
+-- (The default admin seed that used to be here created admin@astrovaak.com with
+-- the password "password". Removed for security — create admins with
+-- `ADMIN_EMAIL=… ADMIN_PASSWORD=… node scripts/create-admin.js`.)
