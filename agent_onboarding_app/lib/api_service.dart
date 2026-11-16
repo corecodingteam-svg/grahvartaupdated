@@ -51,10 +51,12 @@ class ApiService {
     await _post('/hirings/send-otp', {'email': email, 'phone': phone, 'device_id': deviceId});
   }
 
-  /// Returns the one-time verification token required by [submitApplication].
-  static Future<String> verifyEmailOtp({required String email, required String otp}) async {
+  /// Verifies the emailed code. Returns either
+  ///   {mode: 'register', verification_token: …}  → new agent, continue to registration
+  ///   {mode: 'login', application: {name, phone, token_no}} → returning agent
+  static Future<Map<String, dynamic>> verifyEmailOtp({required String email, required String otp}) async {
     final body = await _post('/hirings/verify-otp', {'email': email, 'otp': otp});
-    return body['data']['verification_token'] as String;
+    return Map<String, dynamic>.from(body['data'] as Map);
   }
 
   static Future<Map<String, dynamic>> submitApplication(Map<String, dynamic> data) async {

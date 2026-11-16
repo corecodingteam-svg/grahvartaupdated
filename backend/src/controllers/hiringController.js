@@ -98,8 +98,25 @@ exports.sendEmailOtp = async (req, res) => {
     if (!PHONE_RE.test(phone)) return res.status(400).json({ success: false, message: 'Enter a valid 10-digit mobile number' });
     if (!deviceId) return res.status(400).json({ success: false, message: 'Device could not be identified. Please update the app.' });
 
-    const conflict = await findRegistrationConflict({ phone, email, deviceId });
-    if (conflict) return res.status(409).json({ success: false, message: conflict });
+    // Same screen handles new registrations and returning agents:
+    //  - mobile already has an application → it's a login; the email (and the
+    //    registering device, when known) must match that application
+    //  - otherwise → new registration; email and device must be unused
+    let mode = 'register';
+    const existingApp = await db.query('SELECT email, device_id FROM agent_hirings WHERE phone = $1', [phone]);
+    if (existingApp.rows.length) {
+      const app = existingApp.rows[0];
+      if (!app.email || app.email.toLowerCase() !== email) {
+        return res.status(409).json({ success: false, message: 'This mobile number is registered with a different email address.' });
+      }
+      if (app.device_id && app.device_id !== deviceId) {
+        return res.status(409).json({ success: false, message: 'This mobile number was registered from a different device. Please use that device.' });
+      }
+      mode = 'login';
+    } else {
+      const conflict = await findRegistrationConflict({ email, deviceId });
+      if (conflict) return res.status(409).json({ success: false, message: conflict });
+    }
 
     const recent = await db.query(
       `SELECT created_at FROM hiring_email_otps
@@ -127,7 +144,7 @@ exports.sendEmailOtp = async (req, res) => {
       return res.status(502).json({ success: false, message: 'Could not send the verification email. Please check the address and try again.' });
     }
 
-    res.json({ success: true, message: `A 5-digit code was sent to ${email}`, expires_in: OTP_TTL_MIN * 60, resend_after: OTP_RESEND_SECONDS });
+    res.json({ success: true, mode, message: `A 5-digit code was sent to ${email}`, expires_in: OTP_TTL_MIN * 60, resend_after: OTP_RESEND_SECONDS });
   } catch (err) {
     console.error('sendEmailOtp error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -165,7 +182,19 @@ exports.verifyEmailOtp = async (req, res) => {
       'UPDATE hiring_email_otps SET verified_at = NOW(), verification_token = $1 WHERE id = $2',
       [verificationToken, row.id]
     );
-    res.json({ success: true, data: { verification_token: verificationToken } });
+
+    // Returning agent (this mobile + email already applied): verifying the
+    // code is their login, so return what the app needs to open the dashboard.
+    const app = row.phone ? await db.query(
+      'SELECT name, phone, token_no, device_id FROM agent_hirings WHERE phone = $1 AND LOWER(email) = $2',
+      [row.phone, email]
+    ) : { rows: [] };
+    if (app.rows.length && (!app.rows[0].device_id || app.rows[0].device_id === row.device_id)) {
+      await db.query('UPDATE hiring_email_otps SET consumed_at = NOW() WHERE id = $1', [row.id]);
+      const { device_id, ...a } = app.rows[0];
+      return res.json({ success: true, data: { mode: 'login', application: a } });
+    }
+    res.json({ success: true, data: { mode: 'register', verification_token: verificationToken } });
   } catch (err) {
     console.error('verifyEmailOtp error:', err);
     res.status(500).json({ success: false, message: 'Server error' });
