@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import 'astrologer_own_profile_screen.dart';
 import 'astrologer_earnings_screen.dart';
 import 'availability_sheet.dart';
+import 'week_earnings_card.dart';
 
 class AstrologerDashboardScreen extends StatelessWidget {
   const AstrologerDashboardScreen({super.key});
@@ -116,6 +117,7 @@ class _AstrologerDashboardView extends StatelessWidget {
                             ),
                             child: const AvailabilityPanel(),
                           ),
+                        WeekEarningsCard(earningsChart: state.data?['earnings_chart'] as List<dynamic>?),
                         _buildStats(context, astrologer, state.data),
                         const SizedBox(height: 20),
                         _buildRecentConsultations(context, state.data),
