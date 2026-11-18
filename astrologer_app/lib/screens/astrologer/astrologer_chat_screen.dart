@@ -73,6 +73,7 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
     });
     socket.on('consultation_ended', (data) {
       if (!mounted) return;
+      if (data is Map && data['consultation_id'] != null && data['consultation_id'] != widget.consultationId) return;
       final alreadyEnded = _cubit.state.isEnded;
       _cubit.setEnded();
       if (!alreadyEnded) {

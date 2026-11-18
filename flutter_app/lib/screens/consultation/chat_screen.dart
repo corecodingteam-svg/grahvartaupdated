@@ -159,6 +159,8 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     _socket.on('consultation_ended', (data) {
+      final cid = _bloc.state.consultationId;
+      if (cid != null && data is Map && data['consultation_id'] != null && data['consultation_id'] != cid) return;
       _bloc.add(ChatConsultationEnded(Map<String, dynamic>.from(data)));
       if (!_dialogShown) {
         _dialogShown = true;
@@ -172,7 +174,9 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     });
 
-    _socket.on('consultation_rejected', (_) {
+    _socket.on('consultation_rejected', (data) {
+      final rc = _bloc.state.consultationId;
+      if (rc != null && data is Map && data['consultation_id'] != null && data['consultation_id'] != rc) return;
       _bloc.add(ChatSystemMessage('Astrologer is busy. Please try again later.'));
     });
 

@@ -53,7 +53,7 @@ class BillingEngine {
         `UPDATE consultation_queue SET status = 'cancelled' WHERE consultation_id = $1 AND status NOT IN ('cancelled', 'completed')`,
         [this.consultationId]
       );
-      this.io.to(`consultation:${this.consultationId}`).emit('consultation_ended', {
+      (this.io.emitToParties ? { emit: (e, d) => this.io.emitToParties(this.consultationId, e, d) } : this.io.to(`consultation:${this.consultationId}`)).emit('consultation_ended', {
         consultation_id: this.consultationId,
         reason: 'inactivity',
         duration,
@@ -92,7 +92,7 @@ class BillingEngine {
           }
         }
         await this.stop();
-        this.io.to(`consultation:${this.consultationId}`).emit('consultation_ended', {
+        (this.io.emitToParties ? { emit: (e, d) => this.io.emitToParties(this.consultationId, e, d) } : this.io.to(`consultation:${this.consultationId}`)).emit('consultation_ended', {
           consultation_id: this.consultationId,
           reason: 'insufficient_balance',
           duration: this.secondsElapsed,

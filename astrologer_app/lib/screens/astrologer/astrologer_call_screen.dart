@@ -57,6 +57,8 @@ class _AstrologerCallScreenState extends State<AstrologerCallScreen> {
     });
     socket.on('consultation_ended', (data) {
       if (!mounted || _isEnded) return;
+      // Events now also arrive on the astrologer's personal channel — ignore other consultations
+      if (data is Map && data['consultation_id'] != null && data['consultation_id'] != widget.consultationId) return;
       setState(() => _isEnded = true);
       _cleanup();
       widget.onEnd();

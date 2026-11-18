@@ -58,6 +58,7 @@ class _AstrologerMainScreenState extends State<AstrologerMainScreen> with Single
     SocketService.instance.off('new_consultation_request');
     SocketService.instance.off('consultation_started');
     SocketService.instance.off('consultation_ended');
+    SocketService.instance.off('consultation_rejected');
     _ringtonePlayer.dispose();
     _cubit.close();
     super.dispose();
@@ -79,8 +80,14 @@ class _AstrologerMainScreenState extends State<AstrologerMainScreen> with Single
     });
     socket.on('consultation_ended', (data) {
       if (!mounted) return;
+      // The request that is ringing right now was cancelled by the user
+      if (_dismissIfRinging(data, 'cancelled the request')) return;
       _cubit.setIndex(1);
       _consultationsKey.refresh();
+    });
+    socket.on('consultation_rejected', (data) {
+      if (!mounted) return;
+      _dismissIfRinging(data, 'is no longer waiting');
     });
 
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
@@ -88,6 +95,20 @@ class _AstrologerMainScreenState extends State<AstrologerMainScreen> with Single
         SocketService.instance.emit('set_role', {'role': 'astrologer'});
       }
     });
+  }
+
+  /// Stop ringing and close the incoming-request popup if [data] is about the
+  /// request currently shown. Returns true when it was.
+  bool _dismissIfRinging(dynamic data, String what) {
+    final req = _cubit.state.incomingRequest;
+    final id = data is Map ? data['consultation_id']?.toString() : null;
+    if (req == null || id == null || req['consultation_id']?.toString() != id) return false;
+    _stopRingtone();
+    _cubit.clearIncomingRequest();
+    _consultationsKey.refresh();
+    final name = req['user']?['name']?.toString() ?? 'The user';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name $what')));
+    return true;
   }
 
   Future<void> _playRingtone() async {

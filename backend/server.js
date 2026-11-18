@@ -148,7 +148,7 @@ cron.schedule('*/10 * * * *', async () => {
       );
 
       // Notify user via socket if still connected
-      io.to(`consultation:${row.id}`).emit('consultation_ended', {
+      io.emitToParties(row.id, 'consultation_ended', {
         consultation_id: row.id,
         reason: 'queue_timeout',
       });

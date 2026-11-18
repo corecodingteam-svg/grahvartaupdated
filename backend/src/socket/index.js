@@ -44,6 +44,26 @@ function initSocket(io) {
     io.emit('astrologer_availability', payload);
   }
 
+  /**
+   * Deliver a call event (started / rejected / ended) to everyone in the call:
+   * the consultation room AND both people's personal rooms. Phones reconnect
+   * often (new socket each time) and drop out of the consultation room, but
+   * every socket joins user:<id> on connect — so nobody misses a hang-up and
+   * is left ringing. Socket.IO sends once per socket even if it is in several
+   * of these rooms.
+   */
+  async function emitToParties(consultationId, event, payload) {
+    const r = await db.query(
+      `SELECT c.user_id, a.user_id AS astro_user_id FROM consultations c
+       JOIN astrologers a ON a.id = c.astrologer_id WHERE c.id = $1`,
+      [consultationId]
+    ).catch(() => ({ rows: [] }));
+    let target = io.to(`consultation:${consultationId}`);
+    if (r.rows[0]) target = target.to(`user:${r.rows[0].user_id}`).to(`user:${r.rows[0].astro_user_id}`);
+    target.emit(event, payload);
+  }
+  io.emitToParties = (id, ev, data) => emitToParties(id, ev, data).catch(err => console.error('[emitToParties]', err.message));
+
   // Server start: nobody is connected yet, so nobody is online. Sockets that
   // reconnect re-announce themselves via set_role.
   db.query('UPDATE astrologers SET is_online = FALSE WHERE is_online = TRUE')
@@ -346,7 +366,7 @@ function initSocket(io) {
           label: sessionLabel,
         });
 
-        io.to(`consultation:${consultation_id}`).emit('consultation_started', {
+        io.emitToParties(consultation_id, 'consultation_started', {
           consultation_id,
           started_at: now,
           type: consult.rows[0].type,
@@ -364,7 +384,15 @@ function initSocket(io) {
 
     // ─── JOIN EXISTING CONSULTATION ROOM (astrologer portal chat) ──
     socket.on('join_consultation', async ({ consultation_id }) => {
-      if (await partyOf(consultation_id)) socket.join(`consultation:${consultation_id}`);
+      if (!(await partyOf(consultation_id))) return;
+      socket.join(`consultation:${consultation_id}`);
+      // Reconnected after the other side already hung up / declined? Tell it now.
+      const st = await db.query('SELECT status, duration_seconds, total_amount FROM consultations WHERE id = $1', [consultation_id]).catch(() => ({ rows: [] }));
+      const status = st.rows[0]?.status;
+      if (status === 'cancelled') socket.emit('consultation_rejected', { consultation_id });
+      if (['completed', 'cancelled', 'missed'].includes(status)) {
+        socket.emit('consultation_ended', { consultation_id, reason: status, duration: st.rows[0].duration_seconds, total_amount: st.rows[0].total_amount });
+      }
     });
 
     // ─── REJECT / DECLINE ────────────────────────────────────────
@@ -377,7 +405,7 @@ function initSocket(io) {
       if (!r.rows.length) return;
       await db.query(`UPDATE consultation_queue SET status='cancelled' WHERE consultation_id=$1`, [consultation_id]).catch(() => {});
       await db.query('UPDATE astrologers SET queue_count = GREATEST(queue_count - 1, 0) WHERE id = $1', [r.rows[0].astrologer_id]).catch(() => {});
-      io.to(`consultation:${consultation_id}`).emit('consultation_rejected', { consultation_id });
+      io.emitToParties(consultation_id, 'consultation_rejected', { consultation_id });
     });
 
     // ─── CHAT MESSAGES ───────────────────────────────────────────
@@ -513,12 +541,18 @@ function initSocket(io) {
         await engine.stop();
         billingEngines.delete(consultation_id);
       } else {
-        // No billing engine — update DB directly so session doesn't stay active
-        await db.query(
-          `UPDATE consultations SET status='completed', ended_at=NOW()
-           WHERE id=$1 AND status NOT IN ('completed','cancelled')`,
+        // No billing engine — update DB directly so session doesn't stay active.
+        // A request that was never accepted is a cancellation (and frees the queue).
+        const prev = await db.query(
+          `UPDATE consultations SET status = CASE WHEN status = 'queued' THEN 'cancelled' ELSE 'completed' END, ended_at=NOW()
+           WHERE id=$1 AND status NOT IN ('completed','cancelled','missed')
+           RETURNING status, astrologer_id`,
           [consultation_id]
         );
+        if (prev.rows[0]?.status === 'cancelled') {
+          await db.query(`UPDATE consultation_queue SET status='cancelled' WHERE consultation_id=$1`, [consultation_id]).catch(() => {});
+          await db.query('UPDATE astrologers SET queue_count = GREATEST(queue_count - 1, 0) WHERE id = $1', [prev.rows[0].astrologer_id]).catch(() => {});
+        }
       }
       activeRooms.delete(consultation_id);
 
@@ -528,7 +562,7 @@ function initSocket(io) {
         const durationMin = Math.ceil((consult.duration_seconds || 0) / 60);
         const amount = parseFloat(consult.total_amount || 0).toFixed(2);
 
-        io.to(`consultation:${consultation_id}`).emit('consultation_ended', {
+        io.emitToParties(consultation_id, 'consultation_ended', {
           consultation_id,
           duration: consult.duration_seconds,
           total_amount: consult.total_amount,
@@ -666,7 +700,7 @@ function initSocket(io) {
             }
             await engine.stop();
             billingEngines.delete(socket.consultationId);
-            io.to(`consultation:${socket.consultationId}`).emit('consultation_ended', {
+            io.emitToParties(socket.consultationId, 'consultation_ended', {
               consultation_id: socket.consultationId,
               reason: 'astrologer_disconnected',
               duration: engine.secondsElapsed,
@@ -682,7 +716,7 @@ function initSocket(io) {
         if (engine) {
           await engine.stop();
           billingEngines.delete(socket.consultationId);
-          io.to(`consultation:${socket.consultationId}`).emit('consultation_ended', {
+          io.emitToParties(socket.consultationId, 'consultation_ended', {
             consultation_id: socket.consultationId,
             reason: 'user_disconnected',
             duration: engine.secondsElapsed,
@@ -694,7 +728,7 @@ function initSocket(io) {
             `UPDATE consultations SET status = 'missed', ended_at = NOW() WHERE id = $1 AND status IN ('queued', 'active')`,
             [socket.consultationId]
           ).catch(() => {});
-          io.to(`consultation:${socket.consultationId}`).emit('consultation_ended', {
+          io.emitToParties(socket.consultationId, 'consultation_ended', {
             consultation_id: socket.consultationId,
             reason: 'user_disconnected',
           });

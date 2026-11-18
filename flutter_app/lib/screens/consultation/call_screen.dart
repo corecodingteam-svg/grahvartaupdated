@@ -126,7 +126,12 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _initSocket() {
-    _socket.connect(onConnected: _consultationId == null ? _requestConsultation : null);
+    _socket.connect(
+      onConnected: _consultationId == null ? _requestConsultation : null,
+      // A reconnect drops the socket out of the call room — rejoin it (the
+      // server also replies at once if the astrologer already hung up/declined)
+      onReconnect: () { if (_consultationId != null && !_isEnded) _socket.joinConsultation(_consultationId!); },
+    );
 
     _socket.on('consultation_queued', (data) {
       final id = data['consultation_id'] as String?;
@@ -136,7 +141,11 @@ class _CallScreenState extends State<CallScreen> {
       _initAgora(id);
     });
 
+    bool other(dynamic data) =>
+        _consultationId != null && data is Map && data['consultation_id'] != null && data['consultation_id'] != _consultationId;
+
     _socket.on('consultation_started', (data) {
+      if (other(data)) return;
       if (mounted) setState(() => _isConnected = true);
     });
 
@@ -148,14 +157,14 @@ class _CallScreenState extends State<CallScreen> {
     });
 
     _socket.on('consultation_ended', (data) {
-      if (!mounted || _isEnded) return;
+      if (!mounted || _isEnded || other(data)) return;
       setState(() => _isEnded = true);
       _cleanup().then((_) => _showEndDialog(data));
     });
 
     // Astrologer offline / this call type switched off / blocked / account on hold
     _socket.on('consultation_unavailable', (data) => _closeWithMessage(data is Map ? data['message'] as String? : null));
-    _socket.on('consultation_rejected', (_) => _closeWithMessage('The astrologer is not available right now.'));
+    _socket.on('consultation_rejected', (data) { if (!other(data)) _closeWithMessage('The astrologer declined the call.'); });
     _socket.on('insufficient_balance', (data) => _closeWithMessage('Insufficient balance. Required: ₹${data is Map ? data['required'] : ''}'));
   }
 
