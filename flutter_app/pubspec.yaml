@@ -1,7 +1,7 @@
 name: grahvarta
 description: Grahvarta - Full Astrology Platform
 publish_to: none
-version: 3.1.1+6
+version: 3.1.2+7
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
