@@ -126,8 +126,6 @@ class _AstrologerDashboardView extends StatelessWidget {
                         WeekEarningsCard(earningsChart: state.data?['earnings_chart'] as List<dynamic>?),
                         _performanceCard(context),
                         const SizedBox(height: 20),
-                        _buildStats(context, astrologer, state.data),
-                        const SizedBox(height: 20),
                         _buildRecentConsultations(context, state.data),
                       ],
                     ),
@@ -178,48 +176,6 @@ class _AstrologerDashboardView extends StatelessWidget {
             ))),
           ),
         ]),
-      ),
-    );
-  }
-
-  Widget _buildStats(BuildContext context, AstrologerProfile? astrologer, Map<String, dynamic>? data) {
-    final stats = data?['stats'] ?? {};
-    return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.4,
-      children: [
-        _statCard(context, Icons.people_rounded, 'Consultations', '${stats['total'] ?? 0}', context.clr.accent),
-        _statCard(context, Icons.star_rounded, 'Rating', '${(double.tryParse(astrologer?.rating.toString() ?? '0') ?? 0).toStringAsFixed(1)} (${astrologer?.reviewCount ?? 0})', const Color(0xFFFFD700)),
-        _statCard(context, Icons.trending_up_rounded, 'Total Earnings', '₹${(double.tryParse(stats['total_revenue']?.toString() ?? '0') ?? 0).toStringAsFixed(0)}', context.clr.success),
-        _statCard(context, Icons.access_time_rounded, 'Avg Duration', '${((double.tryParse(stats['avg_duration']?.toString() ?? '0') ?? 0) / 60).round()}m', Colors.blue),
-      ],
-    );
-  }
-
-  Widget _statCard(BuildContext context, IconData icon, String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.clr.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.clr.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const Spacer(),
-          Text(value, style: TextStyle(color: context.clr.txtPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
-          Text(label, style: TextStyle(color: context.clr.txtSecondary, fontSize: 11)),
-        ],
       ),
     );
   }
