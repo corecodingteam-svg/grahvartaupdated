@@ -58,3 +58,15 @@ exports.sendHiringOtp = async ({ to, otp }) => {
     `,
   });
 };
+
+// "Write to Us" from the agent onboarding app — forwarded straight to support.
+// Reply-To is the agent's own email, so support can just hit Reply.
+exports.sendAgentMessageToSupport = async ({ name, phone, email, tokenNo, message }) => {
+  await transporter.sendMail({
+    from: '"Grahvarta Agent App" <support@grahvarta.com>',
+    to: 'support@grahvarta.com',
+    replyTo: email || undefined,
+    subject: `Agent message: ${name || phone}${tokenNo ? ` (${tokenNo})` : ''}`,
+    text: `${message}\n\n— ${name || 'Agent'}\nMobile: ${phone}${email ? `\nEmail: ${email}` : ''}${tokenNo ? `\nApplication: ${tokenNo}` : ''}`,
+  });
+};

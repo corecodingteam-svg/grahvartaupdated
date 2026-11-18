@@ -12,4 +12,9 @@ router.post('/verify-otp', ctrl.verifyEmailOtp);
 router.post('/apply', ctrl.submitApplication);
 router.get('/status', ctrl.getStatus);
 
+// "Write to Us" from the agent app (identified by mobile + registered device)
+const agentMessages = require('../controllers/agentMessageController');
+router.post('/messages', agentMessages.sendMessage);
+router.get('/messages', agentMessages.listOwnMessages);
+
 module.exports = router;

@@ -13,6 +13,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import WithdrawalsPage from './pages/WithdrawalsPage';
 import CommunityPage from './pages/CommunityPage';
 import HiringsPage from './pages/HiringsPage';
+import AgentMessagesPage from './pages/AgentMessagesPage';
 import RechargeOffersPage from './pages/RechargeOffersPage';
 import SubadminsPage from './pages/SubadminsPage';
 import ViolatorsPage from './pages/ViolatorsPage';
@@ -47,6 +48,7 @@ function AppRoutes() {
         <Route path="community" element={<CommunityPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="hirings" element={<HiringsPage />} />
+        <Route path="agent-messages" element={<AgentMessagesPage />} />
         <Route path="recharge-offers" element={<RechargeOffersPage />} />
         <Route path="violators" element={<ViolatorsPage />} />
         <Route path="sub-admins" element={<SuperAdminRoute><SubadminsPage /></SuperAdminRoute>} />

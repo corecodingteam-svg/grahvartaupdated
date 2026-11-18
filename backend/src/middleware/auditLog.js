@@ -32,6 +32,7 @@ const ACTIONS = {
   'POST /hirings/:id/activate-as-astrologer': ['hiring.convert', 'hiring', 'Added agent as astrologer'],
   'POST /hirings/:id/resend-email':           ['hiring.resend_email', 'hiring', 'Resent welcome email'],
   'POST /hirings/:id/reset-password':         ['hiring.reset_password', 'hiring', 'Reset agent password'],
+  'PATCH /agent-messages/:id':                ['agent_message.update', 'agent_message', 'Updated agent message'],
   'POST /recharge-offers':                    ['recharge_offer.create', 'recharge_offer', 'Created recharge offer'],
   'PUT /recharge-offers/:id':                 ['recharge_offer.update', 'recharge_offer', 'Edited recharge offer'],
   'DELETE /recharge-offers/:id':              ['recharge_offer.delete', 'recharge_offer', 'Deleted recharge offer'],

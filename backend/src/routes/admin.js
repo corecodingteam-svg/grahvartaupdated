@@ -39,6 +39,7 @@ const SECTION_PERMISSIONS = [
   ['/community', 'community'],
   ['/notifications', 'notifications'],
   ['/hirings', 'hirings'],
+  ['/agent-messages', 'hirings'],
   ['/recharge-offers', 'recharge_offers'],
   ['/moderation', 'moderation'],
 ];
@@ -118,6 +119,11 @@ router.put('/hirings/:id/profile', hiringCtrl.updateProfile);
 router.post('/hirings/:id/activate-as-astrologer', hiringCtrl.activateAsAstrologer);
 router.post('/hirings/:id/resend-email', hiringCtrl.resendWelcomeEmail);
 router.post('/hirings/:id/reset-password', hiringCtrl.resetPassword);
+
+// Agent "Write to Us" messages (Hirings permission)
+const agentMessages = require('../controllers/agentMessageController');
+router.get('/agent-messages', agentMessages.adminList);
+router.patch('/agent-messages/:id', agentMessages.adminUpdate);
 
 // Recharge Offers Management
 const walletCtrl = require('../controllers/walletController');

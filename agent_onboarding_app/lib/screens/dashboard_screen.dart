@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme.dart';
 import '../api_service.dart';
+import '../device_id.dart';
 import 'phone_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -491,18 +493,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => Padding(
-        padding: EdgeInsets.fromLTRB(24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 40),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Write to Us', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-          const SizedBox(height: 6),
-          const Text('Send us a message and we\'ll get back to you.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-          const SizedBox(height: 20),
-          TextField(maxLines: 4, decoration: InputDecoration(hintText: 'Type your message here...', border: OutlineInputBorder())),
-          const SizedBox(height: 16),
-          SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Message sent!'))); }, child: const Text('Send Message'))),
-        ]),
-      ),
+      builder: (_) => _WriteToUsSheet(phone: widget.phone),
     );
   }
 
@@ -582,4 +573,136 @@ class _FaqItem extends StatelessWidget {
       Text(a, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.5)),
     ]),
   );
+}
+
+/// "Write to Us": sends the message to Grahvarta (it reaches the admin panel
+/// and support@grahvarta.com) and lists earlier messages with any replies.
+class _WriteToUsSheet extends StatefulWidget {
+  final String phone;
+  const _WriteToUsSheet({required this.phone});
+  @override
+  State<_WriteToUsSheet> createState() => _WriteToUsSheetState();
+}
+
+class _WriteToUsSheetState extends State<_WriteToUsSheet> {
+  final _ctrl = TextEditingController();
+  bool _sending = false;
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _history = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final history = await ApiService.getSupportMessages(phone: widget.phone, deviceId: await DeviceId.get());
+    if (mounted) setState(() { _history = history; _loading = false; });
+  }
+
+  Future<void> _send() async {
+    final text = _ctrl.text.trim();
+    if (text.length < 2) { setState(() => _error = 'Please type your message'); return; }
+    setState(() { _sending = true; _error = null; });
+    try {
+      await ApiService.sendSupportMessage(phone: widget.phone, deviceId: await DeviceId.get(), message: text);
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Message sent. We will get back to you soon.'),
+        backgroundColor: AppColors.success,
+      ));
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _sending = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = DateFormat('d MMM, h:mm a');
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 32),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Write to Us', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+        const SizedBox(height: 6),
+        const Text('Send us a message and we\'ll get back to you.', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        if (_loading)
+          const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: LinearProgressIndicator(color: AppColors.primary, minHeight: 2))
+        else if (_history.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          const Text('Your messages', style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.3),
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: _history.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (_, i) {
+                final m = _history[i];
+                final created = DateTime.tryParse(m['created_at']?.toString() ?? '')?.toLocal();
+                final reply = (m['admin_reply'] as String?)?.trim();
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(m['message']?.toString() ?? '', style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+                    const SizedBox(height: 4),
+                    Text(created != null ? fmt.format(created) : '', style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                    if (reply != null && reply.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.only(left: 10),
+                        decoration: const BoxDecoration(border: Border(left: BorderSide(color: AppColors.primary, width: 2))),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          const Text('Grahvarta replied', style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 2),
+                          Text(reply, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                        ]),
+                      ),
+                    ] else
+                      const Padding(
+                        padding: EdgeInsets.only(top: 4),
+                        child: Text('Awaiting reply', style: TextStyle(color: AppColors.textMuted, fontSize: 11, fontStyle: FontStyle.italic)),
+                      ),
+                  ]),
+                );
+              },
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        TextField(
+          controller: _ctrl,
+          maxLines: 4,
+          maxLength: 2000,
+          enabled: !_sending,
+          decoration: const InputDecoration(hintText: 'Type your message here...', border: OutlineInputBorder(), counterText: ''),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 8),
+          Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 13)),
+        ],
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _sending ? null : _send,
+            child: _sending
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('Send Message'),
+          ),
+        ),
+      ]),
+    );
+  }
 }

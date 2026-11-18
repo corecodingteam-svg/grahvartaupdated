@@ -37,6 +37,7 @@ const migrations = [
   '030_test_wallet_credit.sql',
   '031_recharge_offers_dedupe.sql',
   '032_wallet_orders_reconcile.sql',
+  '033_agent_messages.sql',
 ];
 
 // Migrations that existed before the _migrations tracking table was introduced.

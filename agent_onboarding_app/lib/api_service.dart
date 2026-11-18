@@ -59,6 +59,25 @@ class ApiService {
     return Map<String, dynamic>.from(body['data'] as Map);
   }
 
+  /// "Write to Us": sends the message to Grahvarta (admin panel + support@grahvarta.com).
+  static Future<void> sendSupportMessage({required String phone, required String deviceId, required String message}) async {
+    await _post('/hirings/messages', {'phone': phone, 'device_id': deviceId, 'message': message}, okStatus: 201);
+  }
+
+  /// The agent's earlier messages with any replies from Grahvarta (newest first).
+  static Future<List<Map<String, dynamic>>> getSupportMessages({required String phone, required String deviceId}) async {
+    try {
+      final r = await http
+          .get(Uri.parse('$_base/hirings/messages?phone=${Uri.encodeComponent(phone)}&device_id=${Uri.encodeComponent(deviceId)}'))
+          .timeout(const Duration(seconds: 20));
+      if (r.statusCode != 200) return [];
+      final body = jsonDecode(r.body) as Map<String, dynamic>;
+      return List<Map<String, dynamic>>.from(((body['data'] as List?) ?? []).map((e) => Map<String, dynamic>.from(e as Map)));
+    } catch (_) {
+      return [];
+    }
+  }
+
   static Future<Map<String, dynamic>> submitApplication(Map<String, dynamic> data) async {
     final body = await _post('/hirings/apply', data, okStatus: 201);
     return body['data'] as Map<String, dynamic>;
