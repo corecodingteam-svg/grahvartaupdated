@@ -16,7 +16,7 @@ class KundliScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Text('Kundli & Astrology', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text('Kundli & Astrology', style: TextStyle(color: context.clr.onAppBar, fontWeight: FontWeight.bold)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -67,7 +67,7 @@ class KundliScreen extends StatelessWidget {
             icon: '❤️',
             title: 'Compatibility',
             subtitle: 'Check zodiac compatibility for love, friendship and work relationships',
-            color: const Color(0xFFE91E63),
+            color: context.clr.love,
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CompatibilityScreen())),
           ),
 

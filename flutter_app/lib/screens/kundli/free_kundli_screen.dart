@@ -133,7 +133,7 @@ class _FreeKundliScreenState extends State<FreeKundliScreen> with SingleTickerPr
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.white), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(icon: Icon(Icons.arrow_back_ios, color: context.clr.onAppBar), onPressed: () => Navigator.pop(context)),
         title: const Text('Free Kundli'),
       ),
       body: _result == null ? _buildForm() : _buildResult(),
@@ -197,7 +197,7 @@ class _FreeKundliScreenState extends State<FreeKundliScreen> with SingleTickerPr
           child: ElevatedButton(
             onPressed: _isCalculating ? null : _calculate,
             child: _isCalculating
-                ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                ? CircularProgressIndicator(color: context.clr.onAccent, strokeWidth: 2)
                 : const Text('Generate Kundli ✨', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
         ),

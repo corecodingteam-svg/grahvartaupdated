@@ -156,7 +156,7 @@ class _KundliMatchingScreenState extends State<KundliMatchingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.white), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(icon: Icon(Icons.arrow_back_ios, color: context.clr.onAppBar), onPressed: () => Navigator.pop(context)),
         title: const Text('Kundli Matching'),
       ),
       body: SingleChildScrollView(
@@ -165,7 +165,7 @@ class _KundliMatchingScreenState extends State<KundliMatchingScreen> {
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(child: _personCard('👦 Boy', _boyName, context.clr.accent, _boyDob, (d) => setState(() { _boyDob = d; _result = null; }))),
             const SizedBox(width: 12),
-            Expanded(child: _personCard('👧 Girl', _girlName, const Color(0xFFE91E63), _girlDob, (d) => setState(() { _girlDob = d; _result = null; }))),
+            Expanded(child: _personCard('👧 Girl', _girlName, context.clr.love, _girlDob, (d) => setState(() { _girlDob = d; _result = null; }))),
           ]),
           const SizedBox(height: 20),
           if (_result == null)
@@ -173,7 +173,7 @@ class _KundliMatchingScreenState extends State<KundliMatchingScreen> {
               onPressed: _isCalculating ? null : _matchKundli,
               style: ElevatedButton.styleFrom(backgroundColor: context.clr.accent, minimumSize: const Size(double.infinity, 52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
               child: _isCalculating
-                  ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                  ? CircularProgressIndicator(color: context.clr.onAccent, strokeWidth: 2)
                   : const Text('Match Kundli 💑', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             )
           else

@@ -104,7 +104,7 @@ class _MainScreenState extends State<MainScreen> {
       decoration: BoxDecoration(
         color: context.clr.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20)],
+        boxShadow: [BoxShadow(color: context.clr.shadow, blurRadius: 20)],
       ),
       child: SafeArea(
         child: Padding(
@@ -126,11 +126,11 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _navItem({required IconData icon, required int index, required String label, String? badge}) {
     final isSelected = index == _currentIndex;
-    Widget iconWidget = Icon(icon, color: isSelected ? Colors.white : context.clr.txtMuted, size: 22);
+    Widget iconWidget = Icon(icon, color: isSelected ? context.clr.onAccent : context.clr.txtMuted, size: 22);
 
     if (badge != null && !isSelected) {
       iconWidget = badges.Badge(
-        badgeContent: Text(badge, style: const TextStyle(color: Colors.white, fontSize: 8)),
+        badgeContent: Text(badge, style: TextStyle(color: context.clr.onAccent, fontSize: 8)),
         badgeStyle: badges.BadgeStyle(badgeColor: context.clr.error),
         child: iconWidget,
       );
@@ -149,7 +149,7 @@ class _MainScreenState extends State<MainScreen> {
           iconWidget,
           if (isSelected) ...[
             const SizedBox(height: 2),
-            Text(label, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+            Text(label, style: TextStyle(color: context.clr.onAccent, fontSize: 10, fontWeight: FontWeight.w600)),
           ],
         ]),
       ),

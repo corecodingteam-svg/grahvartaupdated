@@ -246,18 +246,18 @@ class _ChatScreenState extends State<ChatScreen> {
             padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+                  decoration: BoxDecoration(color: context.clr.handle, borderRadius: BorderRadius.circular(2))),
               const Text('Send Image', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 16),
               ListTile(
-                leading: CircleAvatar(backgroundColor: context.clr.accent, child: const Icon(Icons.photo_library, color: Colors.white)),
+                leading: CircleAvatar(backgroundColor: context.clr.accent, child: Icon(Icons.photo_library, color: context.clr.onAccent)),
                 title: const Text('Choose from Gallery'),
                 onTap: () { Navigator.pop(context); _pickAndSendImage(ImageSource.gallery); },
               ),
               ListTile(
                 leading: CircleAvatar(
                   backgroundColor: context.clr.accent,
-                  child: Icon(_cameraDevice == CameraDevice.front ? Icons.camera_front : Icons.camera_rear, color: Colors.white),
+                  child: Icon(_cameraDevice == CameraDevice.front ? Icons.camera_front : Icons.camera_rear, color: context.clr.onAccent),
                 ),
                 title: Text(_cameraDevice == CameraDevice.front ? 'Take Selfie (Front Camera)' : 'Take Photo (Rear Camera)'),
                 trailing: IconButton(
@@ -507,7 +507,12 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             // Messages — rebuilds only when messages list changes
             Expanded(child: Stack(children: [
-              const Positioned.fill(child: CustomPaint(painter: _AstroBgPainter())),
+              Positioned.fill(child: CustomPaint(painter: _AstroBgPainter(
+                backdrop: context.clr.chatBackdrop,
+                speck: context.clr.chatSpeck,
+                glow: context.clr.chatGlow,
+                glowAlt: context.clr.chatGlowAlt,
+              ))),
               BlocBuilder<ChatBloc, ChatState>(
                 buildWhen: (prev, curr) => prev.messages != curr.messages,
                 builder: (_, state) => _buildMessages(state),
@@ -672,7 +677,7 @@ class _ChatScreenState extends State<ChatScreen> {
       bubbleContent = Container(
         width: 180, height: 140,
         decoration: BoxDecoration(color: isUser ? context.clr.accent : context.clr.card, borderRadius: borderRadius),
-        child: const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+        child: Center(child: CircularProgressIndicator(color: context.clr.onAccent, strokeWidth: 2)),
       );
     } else if (isImage) {
       bubbleContent = GestureDetector(
@@ -700,10 +705,10 @@ class _ChatScreenState extends State<ChatScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(color: isUser ? context.clr.accent : context.clr.card, borderRadius: borderRadius),
         child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(msg.content, style: TextStyle(color: isUser ? Colors.white : context.clr.txtPrimary, fontSize: 14)),
+          Text(msg.content, style: TextStyle(color: isUser ? context.clr.onAccent : context.clr.txtPrimary, fontSize: 14)),
           const SizedBox(height: 3),
           Text(DateFormat('h:mm a').format(msg.timestamp),
-              style: TextStyle(color: isUser ? Colors.white60 : context.clr.txtMuted, fontSize: 10)),
+              style: TextStyle(color: isUser ? context.clr.onAccent.withValues(alpha: 0.60) : context.clr.txtMuted, fontSize: 10)),
         ]),
       );
     }
@@ -779,7 +784,7 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: EdgeInsets.fromLTRB(12, 8, 12, bottomInset > 0 ? bottomInset : 12),
       decoration: BoxDecoration(
         color: context.clr.surface,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10)],
+        boxShadow: [BoxShadow(color: context.clr.shadow, blurRadius: 10)],
       ),
       child: Row(children: [
         IconButton(icon: Icon(Icons.add_circle_outline, color: context.clr.txtMuted), onPressed: _showImageOptions),
@@ -811,7 +816,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: SizedBox(
               width: 44, height: 44,
               child: Icon(Icons.send_rounded,
-                  color: state.consultationId != null ? Colors.white : context.clr.txtMuted, size: 20),
+                  color: state.consultationId != null ? context.clr.onAccent : context.clr.txtMuted, size: 20),
             ),
           ),
         ),
@@ -886,7 +891,9 @@ class _AnimatedBubbleState extends State<_AnimatedBubble> with SingleTickerProvi
 }
 
 class _AstroBgPainter extends CustomPainter {
-  const _AstroBgPainter();
+  final List<Color> backdrop;
+  final Color speck, glow, glowAlt;
+  const _AstroBgPainter({required this.backdrop, required this.speck, required this.glow, required this.glowAlt});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -895,13 +902,13 @@ class _AstroBgPainter extends CustomPainter {
 
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);
     canvas.drawRect(rect,
-        Paint()..shader = const LinearGradient(
+        Paint()..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0D0D0D), Color(0xFF1A0A00), Color(0xFF0D0D0D)],
+          colors: backdrop,
         ).createShader(rect));
 
-    paint.color = Colors.white.withOpacity(0.06);
+    paint.color = speck.withValues(alpha: 0.06);
     for (int i = 0; i < 60; i++) {
       canvas.drawCircle(
         Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height),
@@ -911,21 +918,21 @@ class _AstroBgPainter extends CustomPainter {
     }
 
     for (final orb in [
-      [size.width * 0.1, size.height * 0.15, 80.0, 0x0DE8762A],
-      [size.width * 0.9, size.height * 0.4, 100.0, 0x08E8762A],
-      [size.width * 0.3, size.height * 0.75, 70.0, 0x0AE8762A],
-      [size.width * 0.8, size.height * 0.85, 90.0, 0x07FFD700],
+      [size.width * 0.1, size.height * 0.15, 80.0, glow.withValues(alpha: 0.05)],
+      [size.width * 0.9, size.height * 0.4, 100.0, glow.withValues(alpha: 0.03)],
+      [size.width * 0.3, size.height * 0.75, 70.0, glow.withValues(alpha: 0.04)],
+      [size.width * 0.8, size.height * 0.85, 90.0, glowAlt.withValues(alpha: 0.03)],
     ]) {
       canvas.drawCircle(
         Offset(orb[0] as double, orb[1] as double),
         orb[2] as double,
-        Paint()..shader = RadialGradient(colors: [Color(orb[3] as int), Colors.transparent])
+        Paint()..shader = RadialGradient(colors: [orb[3] as Color, Colors.transparent])
             .createShader(Rect.fromCircle(center: Offset(orb[0] as double, orb[1] as double), radius: orb[2] as double)),
       );
     }
 
     final linePaint = Paint()
-      ..color = Colors.white.withOpacity(0.04)
+      ..color = speck.withValues(alpha: 0.04)
       ..strokeWidth = 0.5
       ..style = PaintingStyle.stroke;
     final points = List.generate(8, (_) => Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height));
@@ -945,10 +952,10 @@ class _FullscreenImageScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: context.clr.mediaBg,
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: context.clr.mediaBg,
+        iconTheme: IconThemeData(color: context.clr.onMedia),
       ),
       body: Center(
         child: InteractiveViewer(
@@ -957,8 +964,8 @@ class _FullscreenImageScreen extends StatelessWidget {
             fit: BoxFit.contain,
             loadingBuilder: (_, child, progress) => progress == null
                 ? child
-                : const Center(child: CircularProgressIndicator(color: Colors.white)),
-            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white, size: 64),
+                : Center(child: CircularProgressIndicator(color: context.clr.onMedia)),
+            errorBuilder: (_, __, ___) => Icon(Icons.broken_image, color: context.clr.onMedia, size: 64),
           ),
         ),
       ),

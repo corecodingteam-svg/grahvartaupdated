@@ -68,7 +68,7 @@ class _CompatibilityScreenState extends State<CompatibilityScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.white), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(icon: Icon(Icons.arrow_back_ios, color: context.clr.onAppBar), onPressed: () => Navigator.pop(context)),
         title: const Text('Compatibility'),
       ),
       body: SingleChildScrollView(
@@ -85,7 +85,7 @@ class _CompatibilityScreenState extends State<CompatibilityScreen> {
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _checkCompatibility,
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE91E63), minimumSize: const Size(double.infinity, 52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+            style: ElevatedButton.styleFrom(backgroundColor: context.clr.love, minimumSize: const Size(double.infinity, 52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
             child: const Text('Check Compatibility ❤️', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
           if (_result != null) ...[

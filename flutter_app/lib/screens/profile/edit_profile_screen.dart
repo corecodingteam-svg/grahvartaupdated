@@ -116,7 +116,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          icon: Icon(Icons.arrow_back_ios, color: context.clr.onAppBar),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Edit Profile'),
@@ -144,7 +144,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     width: 100, height: 100,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: LinearGradient(colors: [context.clr.accent, context.clr.accentAlt]),
+                      color: context.clr.accent,
                       boxShadow: [BoxShadow(color: context.clr.accent.withValues(alpha: 0.3), blurRadius: 20)],
                     ),
                     child: _pickedImage != null
@@ -156,7 +156,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(color: context.clr.accent, shape: BoxShape.circle),
-                    child: const Icon(Icons.camera_alt, color: Colors.white, size: 14),
+                    child: Icon(Icons.camera_alt, color: context.clr.onAccent, size: 14),
                   ),
                 ],
               ),
@@ -189,7 +189,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               child: ElevatedButton(
                 onPressed: _isSaving ? null : _save,
                 child: _isSaving
-                    ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                    ? CircularProgressIndicator(color: context.clr.onAccent, strokeWidth: 2)
                     : const Text('Save Changes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
@@ -203,7 +203,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Center(
       child: Text(
         name.isNotEmpty ? name[0].toUpperCase() : 'U',
-        style: const TextStyle(fontSize: 36, color: Colors.white, fontWeight: FontWeight.bold),
+        style: TextStyle(fontSize: 36, color: context.clr.onAccent, fontWeight: FontWeight.bold),
       ),
     );
   }

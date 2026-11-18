@@ -34,9 +34,9 @@ class _ListenScreenState extends State<ListenScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.white), onPressed: () {}),
+        leading: IconButton(icon: Icon(Icons.arrow_back_ios, color: context.clr.onAppBar), onPressed: () {}),
         title: const Text('Listen'),
-        actions: [IconButton(icon: const Icon(Icons.menu, color: Colors.white), onPressed: () {})],
+        actions: [IconButton(icon: Icon(Icons.menu, color: context.clr.onAppBar), onPressed: () {})],
       ),
       body: CustomScrollView(
         slivers: [
@@ -75,9 +75,9 @@ class _ListenScreenState extends State<ListenScreen> {
 
   Widget _buildStoryCard(AudioContent? story) {
     final planets = [
-      {'name': 'Journey to moon', 'planet': 'Moon', 'color': const Color(0xFF8B9DC3)},
-      {'name': 'Journey to Jupiter', 'planet': 'Jupiter', 'color': const Color(0xFFB87333)},
-      {'name': 'Journey to mars', 'planet': 'Mars', 'color': const Color(0xFFCD5C5C)},
+      {'name': 'Journey to moon', 'planet': 'Moon', 'color': context.clr.planet('Moon')},
+      {'name': 'Journey to Jupiter', 'planet': 'Jupiter', 'color': context.clr.planet('Jupiter')},
+      {'name': 'Journey to mars', 'planet': 'Mars', 'color': context.clr.planet('Mars')},
     ];
 
     final index = _stories.isNotEmpty ? _stories.indexOf(story!) : 0;
@@ -112,7 +112,7 @@ class _ListenScreenState extends State<ListenScreen> {
                   child: Container(
                     width: 36, height: 36,
                     decoration: BoxDecoration(color: context.clr.accent, shape: BoxShape.circle),
-                    child: Icon(isPlaying ? Icons.pause : Icons.arrow_forward, color: Colors.white, size: 18),
+                    child: Icon(isPlaying ? Icons.pause : Icons.arrow_forward, color: context.clr.onAccent, size: 18),
                   ),
                 ),
               ],

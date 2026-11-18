@@ -40,9 +40,9 @@ class _TransitsScreenState extends State<TransitsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.white), onPressed: () {}),
+        leading: IconButton(icon: Icon(Icons.arrow_back_ios, color: context.clr.onAppBar), onPressed: () {}),
         title: const Text('Transits'),
-        actions: [IconButton(icon: const Icon(Icons.menu, color: Colors.white), onPressed: () {})],
+        actions: [IconButton(icon: Icon(Icons.menu, color: context.clr.onAppBar), onPressed: () {})],
       ),
       body: CustomScrollView(
         slivers: [
@@ -100,7 +100,7 @@ class _TransitsScreenState extends State<TransitsScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(cat['label']!, textAlign: TextAlign.center,
-                    style: TextStyle(color: isSelected ? Colors.white : context.clr.txtSecondary, fontWeight: FontWeight.w500, fontSize: 14)),
+                    style: TextStyle(color: isSelected ? context.clr.onAccent : context.clr.txtSecondary, fontWeight: FontWeight.w500, fontSize: 14)),
                 ),
               ),
             ),
@@ -147,7 +147,7 @@ class _TransitsScreenState extends State<TransitsScreen> {
   }
 
   Widget _intensityDot(String? intensity) {
-    final color = intensity == 'strong' ? const Color(0xFFE53935) : intensity == 'moderate' ? context.clr.accent : context.clr.accentAlt;
+    final color = intensity == 'strong' ? context.clr.error : intensity == 'moderate' ? context.clr.accent : context.clr.accentAlt;
     return Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle));
   }
 }

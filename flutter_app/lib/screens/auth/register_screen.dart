@@ -90,7 +90,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           gradient: RadialGradient(
             center: Alignment.topCenter,
             radius: 1.5,
-            colors: [context.clr.surface, context.clr.bg],
+            colors: context.clr.pageGlow,
           ),
         ),
         child: SafeArea(
@@ -232,7 +232,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ElevatedButton(
             onPressed: auth.isLoading ? null : _register,
             child: auth.isLoading
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: context.clr.onAccent, strokeWidth: 2))
                 : Text(s.beginJourney),
           ),
           const SizedBox(height: 16),

@@ -82,8 +82,8 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openForm(),
         backgroundColor: context.clr.accent,
-        icon: const Icon(Icons.person_add, color: AppColors.white),
-        label: const Text('Add Member', style: TextStyle(color: AppColors.white)),
+        icon: Icon(Icons.person_add, color: context.clr.onAccent),
+        label: Text('Add Member', style: TextStyle(color: context.clr.onAccent)),
       ),
       body: _isLoading
           ? _buildShimmer()
@@ -438,12 +438,12 @@ class _FamilyMemberFormState extends State<_FamilyMemberForm> {
                 onPressed: _isSaving ? null : _submit,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: context.clr.accent,
-                  foregroundColor: AppColors.white,
+                  foregroundColor: context.clr.onAccent,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   disabledBackgroundColor: context.clr.accent.withValues(alpha: 0.5),
                 ),
                 child: _isSaving
-                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: AppColors.white, strokeWidth: 2))
+                    ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: context.clr.onAccent, strokeWidth: 2))
                     : Text(isEdit ? 'Save Changes' : 'Add Member', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ),
             ),

@@ -24,26 +24,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
     'All', 'Vedic', 'Tarot', 'Numerology', 'Vastu', 'KP System', 'Western', 'Palmistry', 'Face Reading'
   ];
 
-  static const _specialColors = [
-    Color(0xFF027DFD),
-    Color(0xFFF25D50),
-    Color(0xFF6200EE),
-    Color(0xFF1CDAC5),
-    Color(0xFF0553B1),
-    Color(0xFFE8762A),
-  ];
-  Color _cardAccent(int index) => _specialColors[index % _specialColors.length];
+  Color _cardAccent(int index) => context.clr.tagPalette[index % context.clr.tagPalette.length];
 
-  static const _categoryColors = <String, Color>{
-    'Vedic':        Color(0xFF027DFD),
-    'Tarot':        Color(0xFF6200EE),
-    'Numerology':   Color(0xFFF25D50),
-    'Palmistry':    Color(0xFF1CDAC5),
-    'Vastu':        Color(0xFFE8762A),
-    'KP System':    Color(0xFF0553B1),
-    'Western':      Color(0xFF9C27B0),
-    'Face Reading': Color(0xFFF25D50),
-  };
 
   final List<Map<String, String>> _sortOptions = [
     {'key': 'rating',     'label': 'Top Rated'},
@@ -238,7 +220,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: isSelected ? context.clr.accent : context.clr.border),
                     ),
-                    child: Text(s['label']!, style: TextStyle(color: isSelected ? Colors.white : context.clr.txtSecondary, fontSize: 12, fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal)),
+                    child: Text(s['label']!, style: TextStyle(color: isSelected ? context.clr.onAccent : context.clr.txtSecondary, fontSize: 12, fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal)),
                   ),
                 ),
               );
@@ -281,7 +263,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
           itemBuilder: (_, i) {
             final spec = _specializations[i];
             final isSelected = (spec == 'All' && selectedSpec == null) || spec == selectedSpec;
-            final chipColor = _categoryColors[spec] ?? context.clr.accent;
+            final chipColor = context.clr.specialty(spec);
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: GestureDetector(
@@ -292,7 +274,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                     color: isSelected ? chipColor : context.clr.surfaceLight,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(spec, style: TextStyle(color: isSelected ? Colors.white : context.clr.txtSecondary, fontSize: 12, fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal)),
+                  child: Text(spec, style: TextStyle(color: isSelected ? context.clr.onAccent : context.clr.txtSecondary, fontSize: 12, fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal)),
                 ),
               ),
             );
@@ -407,7 +389,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
   Widget _buildSpecChips(Astrologer astrologer) {
     return Wrap(spacing: 6, runSpacing: 4, children: [
       ...astrologer.specializations.take(3).map((s) {
-        final c = _categoryColors[s] ?? context.clr.accent;
+        final c = context.clr.specialty(s);
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(color: c.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: c.withValues(alpha: 0.3))),
@@ -426,9 +408,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
     return Row(children: [
       Expanded(child: _consultBtn(Icons.chat_bubble_outline, 'Chat', context.clr.accent, () => _startConsultation(astrologer, 'chat'))),
       const SizedBox(width: 8),
-      Expanded(child: _consultBtn(Icons.phone_outlined, 'Call', const Color(0xFF4CAF50), () => _startConsultation(astrologer, 'voice'))),
+      Expanded(child: _consultBtn(Icons.phone_outlined, 'Call', context.clr.voice, () => _startConsultation(astrologer, 'voice'))),
       const SizedBox(width: 8),
-      Expanded(child: _consultBtn(Icons.videocam_outlined, 'Video', const Color(0xFF2196F3), () => _startConsultation(astrologer, 'video'))),
+      Expanded(child: _consultBtn(Icons.videocam_outlined, 'Video', context.clr.video, () => _startConsultation(astrologer, 'video'))),
     ]);
   }
 
@@ -439,9 +421,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(12)),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, color: Colors.white, size: 15),
+          Icon(icon, color: context.clr.onAccent, size: 15),
           const SizedBox(width: 5),
-          Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(label, style: TextStyle(color: context.clr.onAccent, fontSize: 12, fontWeight: FontWeight.w600)),
         ]),
       ),
     );
@@ -491,7 +473,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: isSel ? context.clr.accent : context.clr.border),
                       ),
-                      child: Text(s['label']!, style: TextStyle(color: isSel ? Colors.white : context.clr.txtSecondary, fontSize: 13, fontWeight: isSel ? FontWeight.w600 : FontWeight.normal)),
+                      child: Text(s['label']!, style: TextStyle(color: isSel ? context.clr.onAccent : context.clr.txtSecondary, fontSize: 13, fontWeight: isSel ? FontWeight.w600 : FontWeight.normal)),
                     ),
                   );
                 }).toList(),

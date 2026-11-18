@@ -105,8 +105,8 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: context.clr.accent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withValues(alpha: 0.65),
+          labelColor: context.clr.tabSelected,
+          unselectedLabelColor: context.clr.tabUnselected,
           tabs: const [Tab(text: '🔴 Live Sessions'), Tab(text: '💬 Community')],
         ),
       ),
@@ -178,8 +178,8 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
                           gradient: LinearGradient(
                             begin: Alignment.topLeft, end: Alignment.bottomRight,
                             colors: isLive
-                                ? [const Color(0xFF3A0D00), const Color(0xFF1A0500)]
-                                : [const Color(0xFF1A1500), const Color(0xFF0D0D0D)],
+                                ? context.clr.liveCardActive
+                                : context.clr.liveCardIdle,
                           ),
                         ),
                         child: Center(child: Icon(Icons.stars, size: 72, color: context.clr.accent.withValues(alpha: 0.25))),
@@ -189,7 +189,7 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                      colors: [Colors.transparent, context.clr.mediaScrim.withValues(alpha: 0.7)],
                       stops: const [0.4, 1.0],
                     ),
                   ),
@@ -199,21 +199,21 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
                   Positioned(top: 12, left: 12, child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(color: context.clr.error, borderRadius: BorderRadius.circular(12)),
-                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.fiber_manual_record, color: Colors.white, size: 8),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.fiber_manual_record, color: context.clr.onMedia, size: 8),
                       SizedBox(width: 4),
-                      Text('LIVE', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      Text('LIVE', style: TextStyle(color: context.clr.onMedia, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ]),
                   )),
                 // Viewer count
                 if (isLive)
                   Positioned(top: 12, right: 12, child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(10)),
+                    decoration: BoxDecoration(color: context.clr.mediaScrim.withValues(alpha: 0.54), borderRadius: BorderRadius.circular(10)),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.remove_red_eye_outlined, color: Colors.white70, size: 12),
+                      Icon(Icons.remove_red_eye_outlined, color: context.clr.onMedia.withValues(alpha: 0.70), size: 12),
                       const SizedBox(width: 4),
-                      Text('${session.viewerCount}', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                      Text('${session.viewerCount}', style: TextStyle(color: context.clr.onMedia.withValues(alpha: 0.70), fontSize: 11)),
                     ]),
                   )),
                 // Astrologer name at bottom
@@ -227,7 +227,7 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
                         : null,
                   ),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(session.astrologerName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14), overflow: TextOverflow.ellipsis)),
+                  Expanded(child: Text(session.astrologerName, style: TextStyle(color: context.clr.onMedia, fontWeight: FontWeight.w600, fontSize: 14), overflow: TextOverflow.ellipsis)),
                 ])),
                 // Join button overlay
                 if (isLive)
@@ -236,7 +236,7 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                       decoration: BoxDecoration(color: context.clr.error, borderRadius: BorderRadius.circular(20)),
-                      child: const Text('Join Live', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                      child: Text('Join Live', style: TextStyle(color: context.clr.onMedia, fontSize: 12, fontWeight: FontWeight.bold)),
                     ),
                   )),
               ]),
@@ -373,7 +373,7 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: isSelected ? color : context.clr.border),
         ),
-        child: Text(label, style: TextStyle(color: isSelected ? Colors.white : context.clr.txtSecondary, fontSize: 12, fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal)),
+        child: Text(label, style: TextStyle(color: isSelected ? context.clr.onAccent : context.clr.txtSecondary, fontSize: 12, fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal)),
       ),
     );
   }
@@ -720,8 +720,8 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                   width: 40, height: 40,
                   decoration: BoxDecoration(color: context.clr.accent, shape: BoxShape.circle),
                   child: _submitting
-                      ? const Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                      ? Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(color: context.clr.onAccent, strokeWidth: 2))
+                      : Icon(Icons.send_rounded, color: context.clr.onAccent, size: 18),
                 ),
               ),
             ]),
@@ -855,7 +855,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      backgroundColor: Colors.black,
+      backgroundColor: context.clr.mediaBg,
       body: Stack(children: [
         // ── Full-screen background ──────────────────────────────────────────
         Positioned.fill(child: _buildBackground()),
@@ -864,7 +864,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
         Positioned.fill(child: DecoratedBox(decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter, end: Alignment.bottomCenter,
-            colors: [Colors.black.withOpacity(0.4), Colors.transparent, Colors.transparent, Colors.black.withOpacity(0.85)],
+            colors: [context.clr.mediaScrim.withValues(alpha: 0.4), Colors.transparent, Colors.transparent, context.clr.mediaScrim.withValues(alpha: 0.85)],
             stops: const [0.0, 0.25, 0.55, 1.0],
           ),
         ))),
@@ -879,29 +879,29 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
               onTap: () => Navigator.pop(context),
               child: Container(
                 width: 36, height: 36,
-                decoration: BoxDecoration(color: Colors.black38, shape: BoxShape.circle),
-                child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 16),
+                decoration: BoxDecoration(color: context.clr.mediaScrim.withValues(alpha: 0.38), shape: BoxShape.circle),
+                child: Icon(Icons.arrow_back_ios_new, color: context.clr.onMedia, size: 16),
               ),
             ),
             const SizedBox(width: 12),
             CircleAvatar(
               radius: 18,
               backgroundColor: context.clr.accent.withValues(alpha: 0.3),
-              child: Text(widget.session.astrologerName[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: Text(widget.session.astrologerName[0], style: TextStyle(color: context.clr.onMedia, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(width: 8),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(widget.session.astrologerName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-              Text(widget.session.title, style: const TextStyle(color: Colors.white70, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(widget.session.astrologerName, style: TextStyle(color: context.clr.onMedia, fontWeight: FontWeight.bold, fontSize: 14)),
+              Text(widget.session.title, style: TextStyle(color: context.clr.onMedia.withValues(alpha: 0.70), fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
             ])),
             // Viewer count
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(color: Colors.black38, borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(color: context.clr.mediaScrim.withValues(alpha: 0.38), borderRadius: BorderRadius.circular(10)),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.remove_red_eye_outlined, color: Colors.white70, size: 12),
+                Icon(Icons.remove_red_eye_outlined, color: context.clr.onMedia.withValues(alpha: 0.70), size: 12),
                 const SizedBox(width: 4),
-                Text('$_viewerCount', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                Text('$_viewerCount', style: TextStyle(color: context.clr.onMedia.withValues(alpha: 0.70), fontSize: 11)),
               ]),
             ),
             const SizedBox(width: 8),
@@ -909,10 +909,10 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(color: context.clr.error, borderRadius: BorderRadius.circular(10)),
-              child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.fiber_manual_record, color: Colors.white, size: 8),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.fiber_manual_record, color: context.clr.onMedia, size: 8),
                 SizedBox(width: 4),
-                Text('LIVE', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                Text('LIVE', style: TextStyle(color: context.clr.onMedia, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
               ]),
             ),
           ]),
@@ -960,12 +960,12 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
 
   Widget _gradientBackground() {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: RadialGradient(
-          center: Alignment(0, -0.3),
+          center: const Alignment(0, -0.3),
           radius: 1.0,
-          colors: [Color(0xFF4A1800), Color(0xFF1A0800), Color(0xFF000000)],
-          stops: [0.0, 0.5, 1.0],
+          colors: context.clr.mediaGlow,
+          stops: const [0.0, 0.5, 1.0],
         ),
       ),
       child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -990,7 +990,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
         CircleAvatar(
           radius: 14,
           backgroundColor: isTip ? context.clr.accentAlt.withValues(alpha: 0.8) : context.clr.accent.withValues(alpha: 0.7),
-          child: Text(msg['avatar'] ?? '?', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+          child: Text(msg['avatar'] ?? '?', style: TextStyle(color: context.clr.onMedia, fontSize: 11, fontWeight: FontWeight.bold)),
         ),
         const SizedBox(width: 8),
         // Message bubble
@@ -1001,13 +1001,13 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: isTip ? context.clr.accentAlt.withValues(alpha: 0.25) : Colors.black.withOpacity(0.45),
+                color: isTip ? context.clr.accentAlt.withValues(alpha: 0.25) : context.clr.mediaScrim.withValues(alpha: 0.45),
                 borderRadius: BorderRadius.circular(16),
                 border: isTip ? Border.all(color: context.clr.accentAlt.withValues(alpha: 0.4)) : null,
               ),
               child: RichText(text: TextSpan(style: const TextStyle(fontSize: 13), children: [
                 TextSpan(text: '${msg['user']}  ', style: TextStyle(color: isTip ? context.clr.accentAlt : context.clr.accent, fontWeight: FontWeight.bold, fontSize: 12)),
-                TextSpan(text: msg['message'], style: const TextStyle(color: Colors.white, fontSize: 13)),
+                TextSpan(text: msg['message'], style: TextStyle(color: context.clr.onMedia, fontSize: 13)),
               ])),
             ),
           ),
@@ -1022,23 +1022,23 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
-            color: Colors.black.withOpacity(0.4),
+            color: context.clr.mediaScrim.withValues(alpha: 0.4),
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
             child: Row(children: [
               // Chat input
               Expanded(child: Container(
                 height: 44,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.12),
+                  color: context.clr.onMedia.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white.withOpacity(0.15)),
+                  border: Border.all(color: context.clr.onMedia.withValues(alpha: 0.15)),
                 ),
                 child: TextField(
                   controller: _chatCtrl,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  style: TextStyle(color: context.clr.onMedia, fontSize: 14),
                   decoration: InputDecoration(
                     hintText: 'Send a message…',
-                    hintStyle: TextStyle(color: Colors.white38, fontSize: 13),
+                    hintStyle: TextStyle(color: context.clr.onMedia.withValues(alpha: 0.38), fontSize: 13),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     isDense: true,
@@ -1053,7 +1053,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
                 child: Container(
                   width: 44, height: 44,
                   decoration: BoxDecoration(color: context.clr.accent, shape: BoxShape.circle),
-                  child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                  child: Icon(Icons.send_rounded, color: context.clr.onMedia, size: 20),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1102,7 +1102,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
                 color: tipAmount == amt ? context.clr.accentAlt : context.clr.card,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text('₹$amt', style: TextStyle(color: tipAmount == amt ? Colors.black : context.clr.txtSecondary, fontWeight: FontWeight.w600)),
+              child: Text('₹$amt', style: TextStyle(color: tipAmount == amt ? context.clr.onAccentAlt : context.clr.txtSecondary, fontWeight: FontWeight.w600)),
             ),
           )).toList()),
           const SizedBox(height: 12),
@@ -1116,7 +1116,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
             },
             icon: const Text('🎁'),
             label: Text('Send ₹${tipAmount.toInt()} Gift'),
-            style: ElevatedButton.styleFrom(backgroundColor: context.clr.accentAlt, foregroundColor: Colors.black),
+            style: ElevatedButton.styleFrom(backgroundColor: context.clr.accentAlt, foregroundColor: context.clr.onAccentAlt),
           ),
         ]),
       )),
@@ -1132,15 +1132,18 @@ class _StarField extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: 200, height: 80,
-      child: CustomPaint(painter: _StarPainter()),
+      child: CustomPaint(painter: _StarPainter(context.clr.onMedia)),
     );
   }
 }
 
 class _StarPainter extends CustomPainter {
+  final Color color;
+  _StarPainter(this.color);
+
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.white.withOpacity(0.6);
+    final paint = Paint()..color = color.withValues(alpha: 0.6);
     final positions = [
       Offset(20, 10), Offset(60, 30), Offset(100, 8), Offset(140, 25), Offset(180, 12),
       Offset(40, 55), Offset(90, 65), Offset(130, 50), Offset(170, 70), Offset(10, 70),

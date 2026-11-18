@@ -107,17 +107,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
-  static const _darkGradients = [
-    [Color(0xFF2D1B00), Color(0xFF0D0D0D)],
-    [Color(0xFF0D1A2D), Color(0xFF0D0D0D)],
-    [Color(0xFF1A0D2D), Color(0xFF0D0D0D)],
-  ];
-  static const _lightGradients = [
-    [Color(0xFFE8F4FF), Color(0xFFFFFFFF)],
-    [Color(0xFFE0EEFF), Color(0xFFFFFFFF)],
-    [Color(0xFFEEE8FF), Color(0xFFFFFFFF)],
-  ];
-
   Color _accentForPage(int index, BuildContext context) =>
       index == 0 ? context.clr.accent : context.clr.accentAlt;
 
@@ -130,8 +119,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gradients = isDark ? _darkGradients : _lightGradients;
+    final gradients = context.clr.onboardingBackgrounds;
 
     return Scaffold(
       backgroundColor: context.clr.bg,
@@ -212,7 +200,7 @@ class _BackgroundSymbols extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final symbolColor = isDark ? accentColor : Color.lerp(accentColor, const Color(0xFF042B59), 0.4)!;
+    final symbolColor = isDark ? accentColor : Color.lerp(accentColor, context.clr.navy, 0.4)!;
     final i = page.floor().clamp(0, _pages.length - 1);
     final j = (i + 1).clamp(0, _pages.length - 1);
     return AnimatedBuilder(
@@ -441,7 +429,7 @@ class _BottomControls extends StatelessWidget {
                   child: Text(
                     isLast ? 'Get Started  →' : 'Continue  →',
                     key: ValueKey(isLast),
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+                    style: TextStyle(color: context.clr.onAccent, fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.3),
                   ),
                 ),
               ),

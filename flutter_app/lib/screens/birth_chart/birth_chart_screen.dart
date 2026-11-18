@@ -62,9 +62,9 @@ class _BirthChartScreenState extends State<BirthChartScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.white), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(icon: Icon(Icons.arrow_back_ios, color: context.clr.onAppBar), onPressed: () => Navigator.pop(context)),
         title: const Text('Your Birth Chart'),
-        actions: [IconButton(icon: const Icon(Icons.refresh, color: Colors.white), onPressed: _loadChart)],
+        actions: [IconButton(icon: Icon(Icons.refresh, color: context.clr.onAppBar), onPressed: _loadChart)],
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: context.clr.accent))
@@ -145,7 +145,7 @@ class _BirthChartScreenState extends State<BirthChartScreen> {
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(vertical: 10),
               decoration: BoxDecoration(color: isSelected ? context.clr.accent : context.clr.card, borderRadius: BorderRadius.circular(10)),
-              child: Text(_tabs[i], textAlign: TextAlign.center, style: TextStyle(color: isSelected ? Colors.white : context.clr.txtSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
+              child: Text(_tabs[i], textAlign: TextAlign.center, style: TextStyle(color: isSelected ? context.clr.onAccent : context.clr.txtSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
             ),
           ),
         ));

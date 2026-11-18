@@ -62,7 +62,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'live_started': return context.clr.error;
       case 'consultation_ended': return context.clr.success;
       case 'wallet_credit': return context.clr.accentAlt;
-      case 'cosmic_event': return const Color(0xFF9C27B0);
+      case 'cosmic_event': return context.clr.mystic;
       case 'review': return context.clr.accentAlt;
       default: return context.clr.txtMuted;
     }
@@ -90,13 +90,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(color: context.clr.accent, borderRadius: BorderRadius.circular(12)),
-              child: Text('$unreadCount', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+              child: Text('$unreadCount', style: TextStyle(color: context.clr.onAccent, fontSize: 11, fontWeight: FontWeight.bold)),
             ),
           ],
         ]),
         actions: [
           if (unreadCount > 0)
-            TextButton(onPressed: _markAllRead, child: const Text('Mark all read', style: TextStyle(color: Colors.white, fontSize: 12))),
+            TextButton(onPressed: _markAllRead, child: Text('Mark all read', style: TextStyle(color: context.clr.accent, fontSize: 12))),
         ],
       ),
       body: _isLoading

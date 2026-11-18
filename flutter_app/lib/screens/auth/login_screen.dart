@@ -48,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
           gradient: RadialGradient(
             center: Alignment.topCenter,
             radius: 1.5,
-            colors: [context.clr.surface, context.clr.bg],
+            colors: context.clr.pageGlow,
           ),
         ),
         child: SafeArea(
@@ -152,9 +152,9 @@ class _LoginScreenState extends State<LoginScreen> {
         width: double.infinity,
         child: ElevatedButton(
           onPressed: auth.isLoading ? null : _login,
-          style: ElevatedButton.styleFrom(backgroundColor: context.clr.accent, foregroundColor: Colors.white),
+          style: ElevatedButton.styleFrom(backgroundColor: context.clr.accent, foregroundColor: context.clr.onAccent),
           child: auth.isLoading
-              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+              ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: context.clr.onAccent, strokeWidth: 2))
               : Text(s.signIn),
         ),
       ),

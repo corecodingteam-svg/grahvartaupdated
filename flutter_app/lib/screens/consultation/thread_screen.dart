@@ -289,7 +289,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
           borderRadius: bubbleBorderRadius,
           border: isUser ? null : Border.all(color: context.clr.border),
         ),
-        child: Text(content, style: TextStyle(color: isUser ? Colors.white : context.clr.txtPrimary, fontSize: 13, height: 1.4)),
+        child: Text(content, style: TextStyle(color: isUser ? context.clr.onAccent : context.clr.txtPrimary, fontSize: 13, height: 1.4)),
       );
     }
 
@@ -350,7 +350,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
               color: context.clr.accent,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Text('Book Now', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+            child: Text('Book Now', style: TextStyle(color: context.clr.onAccent, fontSize: 12, fontWeight: FontWeight.w600)),
           ),
         ),
       ]),
@@ -365,14 +365,14 @@ class _ThreadFullscreenImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
+      backgroundColor: context.clr.mediaBg,
+      appBar: AppBar(backgroundColor: context.clr.mediaBg, iconTheme: IconThemeData(color: context.clr.onMedia)),
       body: Center(
         child: InteractiveViewer(
           child: Image.network(
             url, fit: BoxFit.contain,
-            loadingBuilder: (_, child, p) => p == null ? child : const Center(child: CircularProgressIndicator(color: Colors.white)),
-            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white, size: 64),
+            loadingBuilder: (_, child, p) => p == null ? child : Center(child: CircularProgressIndicator(color: context.clr.onMedia)),
+            errorBuilder: (_, __, ___) => Icon(Icons.broken_image, color: context.clr.onMedia, size: 64),
           ),
         ),
       ),

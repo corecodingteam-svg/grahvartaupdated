@@ -368,7 +368,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(width: 20),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(level, style: TextStyle(color: pct >= 60 ? context.clr.accent : Colors.redAccent, fontSize: 22, fontWeight: FontWeight.bold)),
+              Text(level, style: TextStyle(color: pct >= 60 ? context.clr.accent : context.clr.warning, fontSize: 22, fontWeight: FontWeight.bold)),
               Text(s.todaysOutlook, style: TextStyle(color: context.clr.txtMuted, fontSize: 13)),
               if (state.horoscope != null) ...[
                 const SizedBox(height: 4),

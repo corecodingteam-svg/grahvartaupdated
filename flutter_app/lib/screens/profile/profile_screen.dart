@@ -288,20 +288,19 @@ class ProfileScreen extends StatelessWidget {
   Widget _buildAvatar(BuildContext context, user, Color accentColor) {
     final name = user?.name ?? 'U';
     final gradStart = context.clr.accent;
-    final gradEnd = context.clr.accentAlt;
     return Container(
       width: 90, height: 90,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(colors: [gradStart, gradEnd]),
+        color: gradStart,
         boxShadow: [BoxShadow(color: gradStart.withValues(alpha: 0.3), blurRadius: 20, spreadRadius: 5)],
       ),
       child: user?.avatarUrl != null
           ? ClipOval(child: Image.network(user!.avatarUrl!, fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                  style: const TextStyle(fontSize: 36, color: Colors.white, fontWeight: FontWeight.bold)))))
+                  style: TextStyle(fontSize: 36, color: context.clr.onAccent, fontWeight: FontWeight.bold)))))
           : Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'U',
-              style: const TextStyle(fontSize: 36, color: Colors.white, fontWeight: FontWeight.bold))),
+              style: TextStyle(fontSize: 36, color: context.clr.onAccent, fontWeight: FontWeight.bold))),
     );
   }
 

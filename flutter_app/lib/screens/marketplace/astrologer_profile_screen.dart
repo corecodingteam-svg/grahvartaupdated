@@ -259,7 +259,7 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
           left: 16,
           child: _GlassButton(
             onTap: () => Navigator.pop(context),
-            child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
+            child: Icon(Icons.arrow_back_ios_new_rounded, color: context.clr.onMedia, size: 18),
           ),
         ),
       ]),
@@ -345,7 +345,7 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
                   Positioned(top: 2, right: 2, child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(color: context.clr.accent, shape: BoxShape.circle),
-                    child: const Icon(Icons.verified_rounded, color: Colors.white, size: 12),
+                    child: Icon(Icons.verified_rounded, color: context.clr.onAccent, size: 12),
                   )),
               ]),
 
@@ -429,7 +429,7 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
           opacity: _heroController.value * 0.5,
           child: Container(
             width: d[2], height: d[2],
-            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            decoration: BoxDecoration(color: context.clr.onMedia, shape: BoxShape.circle),
           ),
         ),
       ),
@@ -468,10 +468,10 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
           border: Border.all(color: isSelected ? context.clr.accent : context.clr.border),
         ),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 14, color: isSelected ? Colors.white : context.clr.txtMuted),
+          Icon(icon, size: 14, color: isSelected ? context.clr.onAccent : context.clr.txtMuted),
           const SizedBox(width: 5),
           Text(label, style: TextStyle(
-            color: isSelected ? Colors.white : context.clr.txtMuted,
+            color: isSelected ? context.clr.onAccent : context.clr.txtMuted,
             fontSize: 13, fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
           )),
         ]),
@@ -517,7 +517,7 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
       const SizedBox(height: 8),
       _AnimatedRateCard(icon: Icons.phone_outlined, label: 'Voice Call', sublabel: 'Audio consultation', rate: a.perMinuteRateCall, color: context.clr.success, delay: 80),
       const SizedBox(height: 8),
-      _AnimatedRateCard(icon: Icons.videocam_outlined, label: 'Video Call', sublabel: 'Face-to-face session', rate: a.perMinuteRateVideo, color: const Color(0xFF2196F3), delay: 160),
+      _AnimatedRateCard(icon: Icons.videocam_outlined, label: 'Video Call', sublabel: 'Face-to-face session', rate: a.perMinuteRateVideo, color: context.clr.video, delay: 160),
     ]);
   }
 
@@ -569,7 +569,7 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
             const SizedBox(width: 10),
             _ConsultIconBtn(
               icon: Icons.videocam_rounded,
-              color: a.canConsult('video') ? const Color(0xFF2196F3) : context.clr.txtMuted,
+              color: a.canConsult('video') ? context.clr.video : context.clr.txtMuted,
               tooltip: a.canConsult('video') ? '₹${a.perMinuteRateVideo.toInt()}/min' : 'Video call unavailable',
               onTap: () => _startConsultation('video'),
             ),
@@ -581,23 +581,20 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
                 duration: const Duration(milliseconds: 200),
                 height: 50,
                 decoration: BoxDecoration(
-                  gradient: a.canConsult('chat')
-                      ? const LinearGradient(colors: [Color(0xFF027DFD), Color(0xFF0553B1)])
-                      : null,
-                  color: a.canConsult('chat') ? null : context.clr.surface,
+                  color: a.canConsult('chat') ? context.clr.accent : context.clr.surface,
                   borderRadius: BorderRadius.circular(14),
                   border: a.canConsult('chat') ? null : Border.all(color: context.clr.border),
                 ),
                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   Icon(Icons.chat_bubble_rounded, size: 18,
-                    color: a.canConsult('chat') ? Colors.white : context.clr.txtMuted),
+                    color: a.canConsult('chat') ? context.clr.onAccent : context.clr.txtMuted),
                   const SizedBox(width: 8),
                   Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(a.canConsult('chat') ? 'Chat Now' : (a.isOnline && a.isAvailable ? 'Chat Off' : 'Offline'),
-                      style: TextStyle(color: a.canConsult('chat') ? Colors.white : context.clr.txtMuted,
+                      style: TextStyle(color: a.canConsult('chat') ? context.clr.onAccent : context.clr.txtMuted,
                         fontSize: 14, fontWeight: FontWeight.bold)),
                     Text('₹${a.perMinuteRateChat.toInt()}/min',
-                      style: TextStyle(color: a.canConsult('chat') ? Colors.white.withOpacity(0.7) : context.clr.txtMuted,
+                      style: TextStyle(color: a.canConsult('chat') ? context.clr.onAccent.withValues(alpha: 0.7) : context.clr.txtMuted,
                         fontSize: 11)),
                   ]),
                 ]),
@@ -621,7 +618,7 @@ class _GlassCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.clr.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        border: Border.all(color: context.clr.border),
       ),
       child: child,
     );
@@ -756,7 +753,7 @@ class _ReviewCardState extends State<_ReviewCard> with SingleTickerProviderState
   @override
   Widget build(BuildContext context) {
     final r = widget.review;
-    final colors = [context.clr.accent, const Color(0xFF9C27B0), const Color(0xFF2196F3), context.clr.success];
+    final colors = [context.clr.accent, context.clr.mystic, context.clr.video, context.clr.success];
     final avatarColor = colors[widget.index % colors.length];
 
     return FadeTransition(
@@ -768,7 +765,7 @@ class _ReviewCardState extends State<_ReviewCard> with SingleTickerProviderState
           decoration: BoxDecoration(
             color: context.clr.surface,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
+            border: Border.all(color: context.clr.border),
           ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
@@ -817,9 +814,9 @@ class _GlassButton extends StatelessWidget {
       child: Container(
         width: 40, height: 40,
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.4),
+          color: context.clr.mediaScrim.withValues(alpha: 0.4),
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+          border: Border.all(color: context.clr.onMedia.withValues(alpha: 0.3)),
         ),
         child: Center(child: child),
       ),

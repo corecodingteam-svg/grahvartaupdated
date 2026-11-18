@@ -269,7 +269,7 @@ class _CallScreenState extends State<CallScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: context.clr.mediaBg,
       body: Stack(children: [
         // Remote video / voice background
         if (_isVideo && _remoteJoined && _engine != null && !_isEnded)
@@ -291,7 +291,7 @@ class _CallScreenState extends State<CallScreen> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: _isCameraOff
-                  ? Container(color: Colors.black, child: const Icon(Icons.videocam_off, color: Colors.white54))
+                  ? Container(color: context.clr.mediaBg, child: Icon(Icons.videocam_off, color: context.clr.onMedia.withValues(alpha: 0.54)))
                   : AgoraVideoView(
                       controller: VideoViewController(
                         rtcEngine: _engine!,
@@ -325,7 +325,7 @@ class _CallScreenState extends State<CallScreen> {
               : null,
         ),
         const SizedBox(height: 24),
-        Text(widget.astrologer.displayName, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+        Text(widget.astrologer.displayName, style: TextStyle(color: context.clr.onMedia, fontSize: 22, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         Text(_isConnected ? _formatTime(_timerSeconds) : 'Connecting…', style: TextStyle(color: context.clr.txtSecondary, fontSize: 16)),
         if (_isConnected) ...[
@@ -348,17 +348,17 @@ class _CallScreenState extends State<CallScreen> {
               _endCall();
             }
           },
-          child: Container(padding: const EdgeInsets.all(8), decoration: const BoxDecoration(color: Colors.black26, shape: BoxShape.circle), child: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 18)),
+          child: Container(padding: EdgeInsets.all(8), decoration: BoxDecoration(color: context.clr.mediaScrim.withValues(alpha: 0.26), shape: BoxShape.circle), child: Icon(Icons.arrow_back_ios, color: context.clr.onMedia, size: 18)),
         ),
         const Spacer(),
         if (_isConnected)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(color: Colors.black38, borderRadius: BorderRadius.circular(20)),
+            decoration: BoxDecoration(color: context.clr.mediaScrim.withValues(alpha: 0.38), borderRadius: BorderRadius.circular(20)),
             child: Row(children: [
               Icon(Icons.timer, color: context.clr.accent, size: 14),
               const SizedBox(width: 4),
-              Text(_formatTime(_timerSeconds), style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+              Text(_formatTime(_timerSeconds), style: TextStyle(color: context.clr.onMedia, fontSize: 14, fontWeight: FontWeight.bold)),
             ]),
           ),
       ]),
@@ -374,7 +374,7 @@ class _CallScreenState extends State<CallScreen> {
             Container(
               margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(color: Colors.black38, borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(color: context.clr.mediaScrim.withValues(alpha: 0.38), borderRadius: BorderRadius.circular(20)),
               child: Text(
                 '₹${_isVideo ? widget.astrologer.perMinuteRateVideo.toInt() : widget.astrologer.perMinuteRateCall.toInt()}/min',
                 style: TextStyle(color: context.clr.accent, fontWeight: FontWeight.bold),
@@ -387,9 +387,9 @@ class _CallScreenState extends State<CallScreen> {
             GestureDetector(
               onTap: _endCall,
               child: Column(children: [
-                Container(width: 64, height: 64, decoration: BoxDecoration(color: context.clr.error, shape: BoxShape.circle), child: Icon(Icons.call_end, color: Colors.white, size: 28)),
+                Container(width: 64, height: 64, decoration: BoxDecoration(color: context.clr.error, shape: BoxShape.circle), child: Icon(Icons.call_end, color: context.clr.onMedia, size: 28)),
                 const SizedBox(height: 6),
-                const Text('End', style: TextStyle(color: Colors.white, fontSize: 11)),
+                Text('End', style: TextStyle(color: context.clr.onMedia, fontSize: 11)),
               ]),
             ),
           ]),
@@ -404,11 +404,11 @@ class _CallScreenState extends State<CallScreen> {
       child: Column(children: [
         Container(
           width: 56, height: 56,
-          decoration: BoxDecoration(color: isActive ? context.clr.accent.withValues(alpha: 0.8) : Colors.white12, shape: BoxShape.circle),
-          child: Icon(icon, color: Colors.white, size: 24),
+          decoration: BoxDecoration(color: isActive ? context.clr.accent.withValues(alpha: 0.8) : context.clr.onMedia.withValues(alpha: 0.12), shape: BoxShape.circle),
+          child: Icon(icon, color: context.clr.onMedia, size: 24),
         ),
         const SizedBox(height: 6),
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+        Text(label, style: TextStyle(color: context.clr.onMedia.withValues(alpha: 0.70), fontSize: 11)),
       ]),
     );
   }

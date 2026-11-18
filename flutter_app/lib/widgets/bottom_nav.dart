@@ -13,7 +13,7 @@ class AstroBottomNav extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.clr.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20)],
+        boxShadow: [BoxShadow(color: context.clr.shadow, blurRadius: 20)],
       ),
       child: SafeArea(
         child: Padding(
@@ -56,7 +56,7 @@ class _NavItem extends StatelessWidget {
         ),
         child: Icon(
           icon,
-          color: isSelected ? Colors.white : context.clr.txtMuted,
+          color: isSelected ? context.clr.onAccent : context.clr.txtMuted,
           size: 24,
         ),
       ),

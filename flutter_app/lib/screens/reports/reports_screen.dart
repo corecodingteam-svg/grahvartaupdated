@@ -548,7 +548,7 @@ class _ReportCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 7),
               decoration: BoxDecoration(color: context.clr.accent, borderRadius: BorderRadius.circular(10)),
-              child: const Center(child: Text('Unlock', style: TextStyle(color: AppColors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+              child: Center(child: Text('Unlock', style: TextStyle(color: context.clr.onAccent, fontSize: 12, fontWeight: FontWeight.bold))),
             ),
           ),
         ]),
@@ -723,7 +723,7 @@ class _PlanCard extends StatelessWidget {
               onPressed: onBuy,
               style: ElevatedButton.styleFrom(
                 backgroundColor: canAfford ? context.clr.accent : context.clr.surface,
-                foregroundColor: canAfford ? AppColors.white : context.clr.txtSecondary,
+                foregroundColor: canAfford ? context.clr.onAccent : context.clr.txtSecondary,
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -821,10 +821,10 @@ class _RatingDialogState extends State<_RatingDialog> {
           onPressed: _submitting ? null : _submit,
           style: ElevatedButton.styleFrom(
               backgroundColor: context.clr.accent,
-              foregroundColor: AppColors.white,
+              foregroundColor: context.clr.onAccent,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
           child: _submitting
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: AppColors.white, strokeWidth: 2))
+              ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: context.clr.onAccent, strokeWidth: 2))
               : const Text('Submit'),
         ),
       ],

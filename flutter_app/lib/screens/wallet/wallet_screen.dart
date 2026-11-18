@@ -350,15 +350,15 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
         actions: [
           TextButton.icon(
             onPressed: _showAddMoneySheet,
-            icon: const Icon(Icons.add, color: Colors.white),
-            label: const Text('Add Money', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+            icon: Icon(Icons.add, color: context.clr.accent),
+            label: Text('Add Money', style: TextStyle(color: context.clr.accent, fontWeight: FontWeight.w600)),
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: context.clr.accent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withValues(alpha: 0.65),
+          labelColor: context.clr.tabSelected,
+          unselectedLabelColor: context.clr.tabUnselected,
           tabs: [Tab(text: s.wallet), Tab(text: s.transactions)],
         ),
       ),
@@ -421,7 +421,7 @@ class _WalletScreenState extends State<WalletScreen> with SingleTickerProviderSt
                   Positioned(top: 0, right: 0, child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(color: context.clr.success, borderRadius: BorderRadius.circular(6)),
-                    child: Text('+${offer.bonusPercent}%', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                    child: Text('+${offer.bonusPercent}%', style: TextStyle(color: context.clr.onAccent, fontSize: 9, fontWeight: FontWeight.bold)),
                   )),
               ]),
             ),

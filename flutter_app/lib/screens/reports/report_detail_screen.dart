@@ -363,8 +363,8 @@ class _InlineRatingDialogState extends State<_InlineRatingDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: Text('Skip', style: TextStyle(color: context.clr.txtMuted))),
         ElevatedButton(
           onPressed: _submitting ? null : _submit,
-          style: ElevatedButton.styleFrom(backgroundColor: context.clr.accent, foregroundColor: AppColors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-          child: _submitting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: AppColors.white, strokeWidth: 2)) : const Text('Submit'),
+          style: ElevatedButton.styleFrom(backgroundColor: context.clr.accent, foregroundColor: context.clr.onAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+          child: _submitting ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: context.clr.onAccent, strokeWidth: 2)) : const Text('Submit'),
         ),
       ],
     );
