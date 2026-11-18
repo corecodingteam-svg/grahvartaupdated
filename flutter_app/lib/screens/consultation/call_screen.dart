@@ -89,7 +89,14 @@ class _CallScreenState extends State<CallScreen> {
 
       // Event handlers
       _engine!.registerEventHandler(RtcEngineEventHandler(
+        // Call diagnostics (shown in device logs)
+        onError: (err, msg) => debugPrint('[call] agora error $err $msg'),
+        onConnectionStateChanged: (_, state, reason) => debugPrint('[call] connection $state ($reason)'),
+        onLocalAudioStateChanged: (_, state, reason) => debugPrint('[call] local audio $state ($reason)'),
+        onRemoteAudioStateChanged: (_, uid, state, reason, __) => debugPrint('[call] remote audio uid=$uid $state ($reason)'),
+        onAudioRoutingChanged: (routing) => debugPrint('[call] audio route $routing'),
         onJoinChannelSuccess: (connection, elapsed) {
+          debugPrint('[call] user joined channel');
           if (mounted) setState(() => _isConnected = true);
           // Force speakerphone — default for audio calls is earpiece
           _engine?.setEnableSpeakerphone(_isSpeakerOn);

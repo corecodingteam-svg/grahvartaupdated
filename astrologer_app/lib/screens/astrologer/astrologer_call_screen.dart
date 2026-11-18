@@ -82,6 +82,17 @@ class _AstrologerCallScreenState extends State<AstrologerCallScreen> {
       await _engine!.initialize(RtcEngineContext(appId: (tokenData['app_id'] ?? tokenData['data']?['app_id'] ?? _agoraAppId) as String));
 
       _engine!.registerEventHandler(RtcEngineEventHandler(
+        // Call diagnostics (shown in device logs)
+        onError: (err, msg) => debugPrint('[call] agora error $err $msg'),
+        onConnectionStateChanged: (_, state, reason) => debugPrint('[call] connection $state ($reason)'),
+        onLocalAudioStateChanged: (_, state, reason) => debugPrint('[call] local audio $state ($reason)'),
+        onRemoteAudioStateChanged: (_, uid, state, reason, __) => debugPrint('[call] remote audio uid=$uid $state ($reason)'),
+        onAudioRoutingChanged: (routing) => debugPrint('[call] audio route $routing'),
+        onJoinChannelSuccess: (_, __) {
+          debugPrint('[call] astrologer joined channel');
+          // Speaker must be switched on after joining (Agora); before joining it is ignored
+          if (!_isVideo) _engine?.setEnableSpeakerphone(true);
+        },
         onUserJoined: (_, uid, __) {
           if (_isSttBot(uid)) return; // transcription bots are not the caller
           if (mounted) setState(() { _remoteUid = uid; _remoteJoined = true; });
@@ -102,12 +113,10 @@ class _AstrologerCallScreenState extends State<AstrologerCallScreen> {
         },
       ));
 
+      await _engine!.enableAudio();
       if (_isVideo) {
         await _engine!.enableVideo();
         await _engine!.startPreview();
-      } else {
-        await _engine!.enableAudio();
-        await _engine!.setEnableSpeakerphone(true);
       }
 
       await _engine!.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
@@ -120,6 +129,8 @@ class _AstrologerCallScreenState extends State<AstrologerCallScreen> {
           clientRoleType: ClientRoleType.clientRoleBroadcaster,
           publishMicrophoneTrack: true,
           publishCameraTrack: _isVideo,
+          autoSubscribeAudio: true,
+          autoSubscribeVideo: _isVideo,
         ),
       );
     } catch (e) {
