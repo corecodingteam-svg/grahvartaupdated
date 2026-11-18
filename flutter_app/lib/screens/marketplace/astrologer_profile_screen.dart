@@ -216,6 +216,8 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
 
     return Scaffold(
       extendBodyBehindAppBar: true,
+      // Consult bar in the bottom slot: content ends right above it, no padding hack
+      bottomNavigationBar: _buildConsultBar(a),
       body: Stack(children: [
         // ── Main scrollable content ──────────────────────────────────────────
         CustomScrollView(slivers: [
@@ -235,16 +237,17 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
             collapsedHeight: 56,
           ),
 
-          // Tab content
-          SliverFillRemaining(
-            child: FadeTransition(
-              opacity: _fadeAnim,
-              child: SlideTransition(
-                position: _slideAnim,
-                child: TabBarView(controller: _tabController, children: [
-                  _buildOverview(a),
-                  _buildReviews(),
-                ]),
+          // Tab content — part of this one scroll view, so short content
+          // (few languages, no reviews) doesn't leave an empty area below it
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            sliver: SliverToBoxAdapter(
+              child: FadeTransition(
+                opacity: _fadeAnim,
+                child: SlideTransition(
+                  position: _slideAnim,
+                  child: _selectedTab == 0 ? _buildOverview(a) : _buildReviews(),
+                ),
               ),
             ),
           ),
@@ -259,9 +262,6 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
             child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
           ),
         ),
-
-        // ── Bottom consult bar ───────────────────────────────────────────────
-        Positioned(bottom: 0, left: 0, right: 0, child: _buildConsultBar(a)),
       ]),
     );
   }
@@ -481,7 +481,7 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
 
   // ─── Overview tab ──────────────────────────────────────────────────────────
   Widget _buildOverview(Astrologer a) {
-    return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 110), children: [
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (a.bio != null) ...[
         _sectionHeader('About', Icons.person_outline_rounded),
         const SizedBox(height: 10),
@@ -530,21 +530,24 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
   // ─── Reviews tab ───────────────────────────────────────────────────────────
   Widget _buildReviews() {
     if (_loadingReviews) {
-      return Center(child: CircularProgressIndicator(color: context.clr.accent, strokeWidth: 2));
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48),
+        child: Center(child: CircularProgressIndicator(color: context.clr.accent, strokeWidth: 2)),
+      );
     }
     if (_reviews.isEmpty) {
-      return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      return Padding(padding: const EdgeInsets.symmetric(vertical: 48), child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
         Icon(Icons.star_outline_rounded, size: 52, color: context.clr.txtMuted),
         const SizedBox(height: 12),
         Text('No reviews yet', style: TextStyle(color: context.clr.txtMuted, fontSize: 15)),
-      ]));
+      ])));
     }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
-      itemCount: _reviews.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (_, i) => _ReviewCard(review: _reviews[i], index: i),
-    );
+    return Column(children: [
+      for (var i = 0; i < _reviews.length; i++) ...[
+        if (i > 0) const SizedBox(height: 12),
+        _ReviewCard(review: _reviews[i], index: i),
+      ],
+    ]);
   }
 
   // ─── Consult bar ───────────────────────────────────────────────────────────

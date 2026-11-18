@@ -73,43 +73,52 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
           final isLoading = state is MarketplaceLoading || state is MarketplaceInitial;
           final loaded = state is MarketplaceLoaded ? state : null;
 
-          return NestedScrollView(
-            headerSliverBuilder: (_, __) => [
-              SliverToBoxAdapter(child: _buildHeader(loaded)),
-              SliverToBoxAdapter(child: _buildSearchBar(loaded)),
-              SliverToBoxAdapter(child: _buildFilters(loaded)),
-              SliverToBoxAdapter(child: _buildSpecializationChips(loaded)),
-            ],
-            body: isLoading
-                ? _buildShimmer()
-                : RefreshIndicator(
-                    onRefresh: () => context.read<MarketplaceCubit>().load(),
-                    color: context.clr.accent,
-                    backgroundColor: context.clr.card,
-                    child: state is MarketplaceError
-                        ? ListView(children: [
-                            const SizedBox(height: 80),
-                            Center(child: Icon(Icons.error_outline, size: 64, color: context.clr.error)),
-                            const SizedBox(height: 16),
-                            Center(child: Text('Could not load astrologers', style: TextStyle(color: context.clr.txtPrimary, fontSize: 16, fontWeight: FontWeight.w600))),
-                            const SizedBox(height: 8),
-                            Center(child: Text('Pull down to retry', style: TextStyle(color: context.clr.txtMuted, fontSize: 13))),
-                          ])
-                        : loaded != null && loaded.astrologers.isEmpty
-                            ? ListView(children: [
-                                const SizedBox(height: 80),
-                                Center(child: Icon(Icons.search_off_rounded, size: 64, color: context.clr.txtMuted)),
-                                const SizedBox(height: 16),
-                                Center(child: Text('No astrologers found', style: TextStyle(color: context.clr.txtPrimary, fontSize: 16, fontWeight: FontWeight.w600))),
-                                const SizedBox(height: 8),
-                                Center(child: Text('Try changing your filters or check back later', style: TextStyle(color: context.clr.txtMuted, fontSize: 13))),
-                              ])
-                            : ListView.builder(
-                                padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
-                                itemCount: loaded?.astrologers.length ?? 0,
-                                itemBuilder: (_, i) => _buildAstrologerCard(loaded!.astrologers[i], i),
-                              ),
-                  ),
+          // One scroll view for header + cards: a short list (e.g. 2 astrologers)
+          // ends right after the last card instead of leaving a big empty area.
+          // (The bottom nav bar sits outside this body, so no extra clearance is needed.)
+          final slivers = <Widget>[
+            SliverToBoxAdapter(child: _buildHeader(loaded)),
+            SliverToBoxAdapter(child: _buildSearchBar(loaded)),
+            SliverToBoxAdapter(child: _buildFilters(loaded)),
+            SliverToBoxAdapter(child: _buildSpecializationChips(loaded)),
+            if (isLoading)
+              SliverToBoxAdapter(child: _buildShimmer())
+            else if (state is MarketplaceError)
+              SliverToBoxAdapter(child: Column(children: [
+                const SizedBox(height: 80),
+                Icon(Icons.error_outline, size: 64, color: context.clr.error),
+                const SizedBox(height: 16),
+                Text('Could not load astrologers', style: TextStyle(color: context.clr.txtPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Text('Pull down to retry', style: TextStyle(color: context.clr.txtMuted, fontSize: 13)),
+              ]))
+            else if (loaded != null && loaded.astrologers.isEmpty)
+              SliverToBoxAdapter(child: Column(children: [
+                const SizedBox(height: 80),
+                Icon(Icons.search_off_rounded, size: 64, color: context.clr.txtMuted),
+                const SizedBox(height: 16),
+                Text('No astrologers found', style: TextStyle(color: context.clr.txtPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Text('Try changing your filters or check back later', style: TextStyle(color: context.clr.txtMuted, fontSize: 13)),
+              ]))
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+                sliver: SliverList.builder(
+                  itemCount: loaded?.astrologers.length ?? 0,
+                  itemBuilder: (_, i) => _buildAstrologerCard(loaded!.astrologers[i], i),
+                ),
+              ),
+          ];
+
+          return RefreshIndicator(
+            onRefresh: () => context.read<MarketplaceCubit>().load(),
+            color: context.clr.accent,
+            backgroundColor: context.clr.card,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: slivers,
+            ),
           );
         },
       ),
@@ -121,7 +130,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
       baseColor: context.clr.surface,
       highlightColor: context.clr.surfaceLight,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
+        // lives inside the page's CustomScrollView now
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
         itemCount: 5,
         itemBuilder: (_, __) => Container(
           margin: const EdgeInsets.only(bottom: 12),
