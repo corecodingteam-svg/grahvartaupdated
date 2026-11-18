@@ -178,6 +178,64 @@ exports.updateNotificationPrefs = async (req, res) => {
   }
 };
 
+// ── Weekly schedule ─────────────────────────────────────────────────────────
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$|^24:00$/;
+const toMin = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+
+/** Validates {"0":[["14:00","16:00"]], ...}. Returns {schedule} or {error}. */
+function normalizeSchedule(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return { error: 'Invalid schedule' };
+  const out = {};
+  for (const [day, slots] of Object.entries(input)) {
+    if (!/^[0-6]$/.test(day)) return { error: 'Invalid day' };
+    if (!Array.isArray(slots)) return { error: 'Invalid time slots' };
+    if (slots.length > 6) return { error: 'Up to 6 time slots per day' };
+    const clean = [];
+    for (const slot of slots) {
+      if (!Array.isArray(slot) || slot.length !== 2 || !TIME_RE.test(slot[0]) || !TIME_RE.test(slot[1])) {
+        return { error: 'Times must look like 14:30' };
+      }
+      if (toMin(slot[0]) >= toMin(slot[1])) return { error: 'Each slot must end after it starts' };
+      clean.push([slot[0], slot[1]]);
+    }
+    clean.sort((x, y) => toMin(x[0]) - toMin(y[0]));
+    for (let i = 1; i < clean.length; i++) {
+      if (toMin(clean[i][0]) < toMin(clean[i - 1][1])) return { error: 'Time slots on the same day overlap' };
+    }
+    if (clean.length) out[day] = clean;
+  }
+  return { schedule: out };
+}
+
+exports.getSchedule = async (req, res) => {
+  try {
+    const id = await astrologerIdOf(req, res);
+    if (!id) return;
+    const a = (await db.query('SELECT weekly_schedule FROM astrologers WHERE id = $1', [id])).rows[0];
+    res.json({ success: true, data: a.weekly_schedule || {} });
+  } catch (err) {
+    console.error('[tools] getSchedule:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.updateSchedule = async (req, res) => {
+  try {
+    const id = await astrologerIdOf(req, res);
+    if (!id) return;
+    const { schedule, error } = normalizeSchedule(req.body?.schedule ?? req.body);
+    if (error) return res.status(400).json({ success: false, message: error });
+    await db.query('UPDATE astrologers SET weekly_schedule = $1 WHERE id = $2', [JSON.stringify(schedule), id]);
+    // Users looking at this astrologer pick up the new timings right away
+    req.io?.emit('astrologer_availability', { astrologer_id: id, weekly_schedule: schedule });
+    res.json({ success: true, data: schedule });
+  } catch (err) {
+    console.error('[tools] updateSchedule:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // ── Performance ─────────────────────────────────────────────────────────────
 
 // One outcome per consultation, from the astrologer's point of view.

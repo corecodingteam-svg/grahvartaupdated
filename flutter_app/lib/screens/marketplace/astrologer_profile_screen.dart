@@ -7,6 +7,7 @@ import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
 import '../consultation/chat_screen.dart';
 import '../consultation/call_screen.dart';
+import '../../utils/weekly_schedule.dart';
 import '../wallet/wallet_screen.dart';
 
 class AstrologerProfileScreen extends StatefulWidget {
@@ -480,12 +481,66 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
   }
 
   // ─── Overview tab ──────────────────────────────────────────────────────────
+  /// Weekly timings set by the astrologer (India time), today highlighted.
+  Widget _buildSchedule(Astrologer a) {
+    final sched = a.weeklySchedule;
+    final today = WeeklySchedule.weekdayIndex(WeeklySchedule.nowIst());
+    final next = a.isOnline ? null : sched.nextAvailableLabel();
+    return _GlassCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (next != null) ...[
+          Row(children: [
+            Icon(Icons.notifications_active_outlined, size: 16, color: context.clr.accent),
+            const SizedBox(width: 6),
+            Expanded(child: Text(next, style: TextStyle(color: context.clr.accentAlt, fontSize: 13, fontWeight: FontWeight.w600))),
+          ]),
+          const SizedBox(height: 10),
+        ],
+        for (var i = 0; i < 7; i++)
+          Builder(builder: (_) {
+            final d = (today + i) % 7; // start from today
+            final slots = sched.slotsFor(d);
+            final isToday = i == 0;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                SizedBox(
+                  width: 96,
+                  child: Text(isToday ? 'Today' : WeeklySchedule.dayNames[d],
+                      style: TextStyle(
+                        color: isToday ? context.clr.accentAlt : context.clr.txtPrimary,
+                        fontSize: 13,
+                        fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                      )),
+                ),
+                Expanded(
+                  child: Text(
+                    slots.isEmpty ? 'Not available' : slots.map((s) => s.text).join(', '),
+                    style: TextStyle(color: slots.isEmpty ? context.clr.txtMuted : context.clr.txtSecondary, fontSize: 13),
+                  ),
+                ),
+              ]),
+            );
+          }),
+        const SizedBox(height: 4),
+        Text('Times are in IST', style: TextStyle(color: context.clr.txtMuted, fontSize: 11)),
+      ]),
+    );
+  }
+
   Widget _buildOverview(Astrologer a) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (a.bio != null) ...[
         _sectionHeader('About', Icons.person_outline_rounded),
         const SizedBox(height: 10),
         _GlassCard(child: Text(a.bio!, style: TextStyle(color: context.clr.txtSecondary, fontSize: 14, height: 1.7))),
+        const SizedBox(height: 22),
+      ],
+
+      if (!a.weeklySchedule.isEmpty) ...[
+        _sectionHeader('Availability', Icons.schedule_rounded),
+        const SizedBox(height: 10),
+        _buildSchedule(a),
         const SizedBox(height: 22),
       ],
 

@@ -535,6 +535,16 @@ class ApiService {
     return _handle(r);
   }
 
+  static Future<Map<String, dynamic>> getSchedule() async {
+    final r = await http.get(Uri.parse('$baseUrl/astrologers/me/schedule'), headers: await _headers(auth: true));
+    return _handle(r);
+  }
+
+  static Future<Map<String, dynamic>> updateSchedule(Map<String, dynamic> schedule) async {
+    final r = await http.put(Uri.parse('$baseUrl/astrologers/me/schedule'), headers: await _headers(auth: true), body: jsonEncode({'schedule': schedule}));
+    return _handle(r);
+  }
+
   static Future<Map<String, dynamic>> getPerformance(int days) async {
     final r = await http.get(Uri.parse('$baseUrl/astrologers/me/performance?days=$days'), headers: await _headers(auth: true));
     return _handle(r);

@@ -43,6 +43,7 @@ const migrations = [
   '036_astrologer_tools.sql',
   '037_absolute_photo_urls.sql',
   '038_astrologer_online_sessions.sql',
+  '039_astrologer_weekly_schedule.sql',
 ];
 
 // Migrations that existed before the _migrations tracking table was introduced.

@@ -26,6 +26,8 @@ router.delete('/me/remedies/:id', authenticate, tools.deleteRemedy);
 router.get('/me/notification-prefs', authenticate, tools.getNotificationPrefs);
 router.put('/me/notification-prefs', authenticate, tools.updateNotificationPrefs);
 router.get('/me/performance', authenticate, tools.getPerformance);
+router.get('/me/schedule', authenticate, tools.getSchedule);
+router.put('/me/schedule', authenticate, tools.updateSchedule);
 router.get('/threads/:userId/messages', authenticate, ctrl.getUserThreadMessages);
 
 // Wildcard routes LAST

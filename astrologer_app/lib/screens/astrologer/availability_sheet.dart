@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
+import '../settings/weekly_schedule_screen.dart';
 import '../../theme/app_theme.dart';
 
 /// Bottom sheet version of [AvailabilityPanel] (opened from the app-bar pill).
@@ -120,6 +121,23 @@ class _AvailabilityPanelState extends State<AvailabilityPanel> {
           padding: const EdgeInsets.only(top: 6),
           child: Text('All consultation types are off — users will see you as unavailable.', style: TextStyle(color: context.clr.error, fontSize: 12)),
         ),
+      Divider(color: context.clr.border, height: 16),
+      InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WeeklyScheduleScreen())),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(children: [
+            Icon(Icons.calendar_month_outlined, color: context.clr.accent, size: 20),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Weekly schedule', style: TextStyle(color: context.clr.txtPrimary, fontWeight: FontWeight.w600)),
+              Text('Set the days and times you are usually available', style: TextStyle(color: context.clr.txtMuted, fontSize: 12)),
+            ])),
+            Icon(Icons.chevron_right_rounded, color: context.clr.txtMuted),
+          ]),
+        ),
+      ),
     ]);
   }
 }

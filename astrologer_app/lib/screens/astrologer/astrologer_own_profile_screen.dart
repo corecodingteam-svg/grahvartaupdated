@@ -13,6 +13,7 @@ import '../auth/change_password_screen.dart';
 import 'astrologer_earnings_screen.dart';
 import 'performance_screen.dart';
 import '../settings/sound_settings_screen.dart';
+import '../settings/weekly_schedule_screen.dart';
 import '../settings/chat_tools_screen.dart';
 
 
@@ -404,6 +405,14 @@ class _AstrologerOwnProfileViewState extends State<_AstrologerOwnProfileView> {
           title: 'Change Password',
           subtitle: 'Update your account password',
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen(isSettings: true))),
+        ),
+        const SizedBox(height: 4),
+        _buildSettingsTile(
+          context,
+          icon: Icons.calendar_month_outlined,
+          title: 'Weekly schedule',
+          subtitle: 'Days and times you are available',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WeeklyScheduleScreen())),
         ),
         const SizedBox(height: 4),
         _buildSettingsTile(

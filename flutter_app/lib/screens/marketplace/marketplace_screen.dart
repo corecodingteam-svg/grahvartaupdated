@@ -305,6 +305,18 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
           ]),
           const SizedBox(height: 12),
           _buildSpecChips(astrologer),
+          // Offline: when they usually come back (from their weekly timings)
+          if (!astrologer.isOnline && astrologer.weeklySchedule.nextAvailableLabel() != null) ...[
+            const SizedBox(height: 10),
+            Row(children: [
+              Icon(Icons.schedule_rounded, size: 14, color: context.clr.accentAlt),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(astrologer.weeklySchedule.nextAvailableLabel()!,
+                    style: TextStyle(color: context.clr.accentAlt, fontSize: 12, fontWeight: FontWeight.w600)),
+              ),
+            ]),
+          ],
           const SizedBox(height: 12),
           _buildConsultButtons(astrologer),
         ]),

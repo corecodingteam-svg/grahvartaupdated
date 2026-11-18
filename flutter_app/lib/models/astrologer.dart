@@ -1,4 +1,5 @@
 import '../services/api_service.dart';
+import '../utils/weekly_schedule.dart';
 String _toTitleCase(String s) =>
     s.split(' ').map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}').join(' ');
 
@@ -26,6 +27,8 @@ class Astrologer {
   final bool isChatAvailable;
   final bool isCallAvailable;
   final bool isVideoAvailable;
+  /// Weekly timings the astrologer set (Sun–Sat, IST)
+  final WeeklySchedule weeklySchedule;
 
   Astrologer({
     required this.id,
@@ -50,6 +53,7 @@ class Astrologer {
     this.isChatAvailable = true,
     this.isCallAvailable = true,
     this.isVideoAvailable = true,
+    this.weeklySchedule = WeeklySchedule.empty,
   });
 
   factory Astrologer.fromJson(Map<String, dynamic> json) {
@@ -82,6 +86,7 @@ class Astrologer {
       isChatAvailable: json['is_chat_available'] ?? true,
       isCallAvailable: json['is_call_available'] ?? true,
       isVideoAvailable: json['is_video_available'] ?? true,
+      weeklySchedule: WeeklySchedule.fromJson(json['weekly_schedule']),
     );
   }
 
@@ -106,6 +111,7 @@ class Astrologer {
     isChatAvailable: e['is_chat_available'] as bool? ?? isChatAvailable,
     isCallAvailable: e['is_call_available'] as bool? ?? isCallAvailable,
     isVideoAvailable: e['is_video_available'] as bool? ?? isVideoAvailable,
+    weeklySchedule: e.containsKey('weekly_schedule') ? WeeklySchedule.fromJson(e['weekly_schedule']) : weeklySchedule,
   );
 
   String get statusText {
