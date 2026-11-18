@@ -153,15 +153,19 @@ class _ChatToolsScreenState extends State<ChatToolsScreen> {
                             style: TextStyle(color: context.clr.txtMuted, height: 1.4),
                           ),
                         ),
-                      ...tools.remedies.map((r) => Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            decoration: BoxDecoration(color: context.clr.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: context.clr.border)),
-                            child: ListTile(
+                      ...tools.remedies.map((r) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Material(
+                              color: context.clr.card,
+                              clipBehavior: Clip.antiAlias,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: context.clr.border)),
+                              child: ListTile(
                               contentPadding: const EdgeInsets.fromLTRB(16, 6, 4, 6),
                               title: Text(r.title, style: TextStyle(color: context.clr.txtPrimary, fontWeight: FontWeight.w600)),
                               subtitle: Text(r.body, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: context.clr.txtMuted, fontSize: 12)),
                               onTap: () => _editRemedy(r),
                               trailing: IconButton(icon: Icon(Icons.delete_outline_rounded, color: context.clr.error), onPressed: () => _delete(r)),
+                            ),
                             ),
                           )),
                     ],
