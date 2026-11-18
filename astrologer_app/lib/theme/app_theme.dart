@@ -289,6 +289,8 @@ class AppTheme {
       chipTheme: const ChipThemeData(
         backgroundColor: LightColors.surfaceLight,
         selectedColor: Color(0x33D9661C),
+        checkmarkColor: LightColors.saffronDeep,
+        secondaryLabelStyle: TextStyle(color: LightColors.saffronDeep, fontWeight: FontWeight.w600),
         side: BorderSide(color: LightColors.border),
         labelStyle: TextStyle(color: LightColors.textSecondary),
       ),

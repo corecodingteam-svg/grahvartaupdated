@@ -505,6 +505,14 @@ class _PerformanceScreenState extends State<PerformanceScreen> {
                   child: ChoiceChip(
                     label: Text('$n days'),
                     selected: _days == n,
+                    // Solid when selected: white text on the accent colour, no tick
+                    showCheckmark: false,
+                    selectedColor: context.clr.accent,
+                    labelStyle: TextStyle(
+                      color: _days == n ? Colors.white : context.clr.txtSecondary,
+                      fontWeight: _days == n ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                    side: BorderSide(color: _days == n ? context.clr.accent : context.clr.border),
                     onSelected: (_) {
                       if (_days == n) return;
                       _days = n;
