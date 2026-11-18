@@ -57,61 +57,17 @@ class _ChatToolsScreenState extends State<ChatToolsScreen> {
   }
 
   Future<void> _editRemedy([Remedy? r]) async {
-    final title = TextEditingController(text: r?.title ?? '');
-    final body = TextEditingController(text: r?.body ?? '');
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: context.clr.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) {
-        String? err;
-        bool busy = false;
-        return StatefulBuilder(builder: (ctx, setS) {
-          Future<void> save() async {
-            setS(() { busy = true; err = null; });
-            try {
-              await _svc.saveRemedy(id: r?.id, title: title.text.trim(), body: body.text.trim());
-              if (ctx.mounted) Navigator.pop(ctx, true);
-            } catch (e) {
-              setS(() { busy = false; err = e.toString(); });
-            }
-          }
-          return Padding(
-            padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
-            child: SafeArea(
-              top: false,
-              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Text(r == null ? 'New remedy' : 'Edit remedy',
-                    style: TextStyle(color: ctx.clr.txtPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: title,
-                  maxLength: 80,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(labelText: 'Title', hintText: 'e.g. Saturn remedy'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: body,
-                  maxLength: 1500,
-                  minLines: 4,
-                  maxLines: 8,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(labelText: 'Remedy', hintText: 'What the user should do, when, and how often', alignLabelWithHint: true),
-                ),
-                if (err != null) Text(err!, style: TextStyle(color: ctx.clr.error, fontSize: 13)),
-                const SizedBox(height: 12),
-                SizedBox(height: 48, child: ElevatedButton(onPressed: busy ? null : save, child: Text(busy ? 'Saving…' : 'Save remedy'))),
-              ]),
-            ),
-          );
-        });
-      },
+      builder: (_) => _RemedyEditor(remedy: r),
     );
-    title.dispose();
-    body.dispose();
-    if (saved == true && mounted) setState(() {});
+    if (saved == true && mounted) {
+      setState(() {});
+      _snack(r == null ? 'Remedy added' : 'Remedy updated');
+    }
   }
 
   Future<void> _delete(Remedy r) async {
@@ -211,6 +167,83 @@ class _ChatToolsScreenState extends State<ChatToolsScreen> {
                     ],
                   ),
                 ),
+    );
+  }
+}
+
+/// Add / edit form for one remedy. Owns its text controllers, so they are
+/// disposed only after the sheet has fully closed.
+class _RemedyEditor extends StatefulWidget {
+  final Remedy? remedy;
+  const _RemedyEditor({this.remedy});
+  @override
+  State<_RemedyEditor> createState() => _RemedyEditorState();
+}
+
+class _RemedyEditorState extends State<_RemedyEditor> {
+  late final _title = TextEditingController(text: widget.remedy?.title ?? '');
+  late final _body = TextEditingController(text: widget.remedy?.body ?? '');
+  bool _busy = false;
+  String? _err;
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _body.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _busy = true;
+      _err = null;
+    });
+    try {
+      await ChatToolsService.instance.saveRemedy(id: widget.remedy?.id, title: _title.text.trim(), body: _body.text.trim());
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _err = e.toString();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+      child: SafeArea(
+        top: false,
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(widget.remedy == null ? 'New remedy' : 'Edit remedy',
+              style: TextStyle(color: context.clr.txtPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _title,
+            enabled: !_busy,
+            maxLength: 80,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(labelText: 'Title', hintText: 'e.g. Saturn remedy'),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _body,
+            enabled: !_busy,
+            maxLength: 1500,
+            minLines: 4,
+            maxLines: 8,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(labelText: 'Remedy', hintText: 'What the user should do, when, and how often', alignLabelWithHint: true),
+          ),
+          if (_err != null) Text(_err!, style: TextStyle(color: context.clr.error, fontSize: 13)),
+          const SizedBox(height: 12),
+          SizedBox(height: 48, child: ElevatedButton(onPressed: _busy ? null : _save, child: Text(_busy ? 'Saving…' : 'Save remedy'))),
+        ]),
+      ),
     );
   }
 }
