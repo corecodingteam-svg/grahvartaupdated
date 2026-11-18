@@ -29,8 +29,20 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  bool _signingIn = false; // guards against a quick double tap starting two sign-ins
+
   Future<void> _login() async {
+    if (_signingIn) return;
     if (!_formKey.currentState!.validate()) return;
+    _signingIn = true;
+    try {
+      await _doLogin();
+    } finally {
+      _signingIn = false;
+    }
+  }
+
+  Future<void> _doLogin() async {
     final auth = context.read<AuthProvider>();
     final success = await auth.login(_emailCtrl.text.trim(), _passCtrl.text,
         loginAs: widget.isAstrologerMode ? 'astrologer' : 'user');
@@ -39,7 +51,11 @@ class _LoginScreenState extends State<LoginScreen> {
     if (widget.isAstrologerMode) {
       // Force password change on first login
       if (auth.user?.mustChangePassword == true) {
-        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()), (_) => false);
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => ChangePasswordScreen(temporaryPassword: _passCtrl.text)),
+          (_) => false,
+        );
         return;
       }
       if (auth.isAstrologer) {

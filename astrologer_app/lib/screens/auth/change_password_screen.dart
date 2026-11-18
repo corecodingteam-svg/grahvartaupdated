@@ -8,7 +8,10 @@ import '../../providers/auth_provider.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   final bool isSettings;
-  const ChangePasswordScreen({super.key, this.isSettings = false});
+  /// The temporary password the astrologer just signed in with. When given,
+  /// it is filled in silently so they don't have to type it a second time.
+  final String? temporaryPassword;
+  const ChangePasswordScreen({super.key, this.isSettings = false, this.temporaryPassword});
 
   @override
   State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
@@ -19,6 +22,16 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _currentCtrl = TextEditingController();
   final _newCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
+
+  /// First-login flow with the temporary password already known from sign-in
+  bool _askTemporary = false; // set if the pre-filled temporary password was rejected
+  bool get _knowsTemporary => !widget.isSettings && !_askTemporary && (widget.temporaryPassword?.isNotEmpty ?? false);
+
+  @override
+  void initState() {
+    super.initState();
+    if (_knowsTemporary) _currentCtrl.text = widget.temporaryPassword!;
+  }
   bool _obscureCurrent = true;
   bool _obscureNew = true;
   bool _obscureConfirm = true;
@@ -57,7 +70,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         }
       }
     } catch (e) {
-      setState(() { _error = e.toString().replaceAll('Exception: ', ''); _loading = false; });
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+        _loading = false;
+        // If the pre-filled temporary password was rejected, let them type it
+        if (!widget.isSettings && !_askTemporary && (widget.temporaryPassword?.isNotEmpty ?? false)) { _askTemporary = true; _currentCtrl.clear(); }
+      });
     }
   }
 
@@ -120,7 +138,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       const Icon(Icons.info_outline, color: Color(0xFF027DFD), size: 16),
                       const SizedBox(width: 8),
                       Expanded(child: Text(
-                        'This step is mandatory. Use the temporary password sent to your email.',
+                        _knowsTemporary
+                            ? 'This step is mandatory. Choose a new password to replace the temporary one from your email.'
+                            : 'This step is mandatory. Use the temporary password sent to your email.',
                         style: TextStyle(color: context.clr.txtSecondary, fontSize: 12, height: 1.4),
                       )),
                     ]),
@@ -150,14 +170,17 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 Form(
                   key: _formKey,
                   child: Column(children: [
-                    _PasswordField(
-                      controller: _currentCtrl,
-                      label: widget.isSettings ? 'Current Password' : 'Temporary Password (from email)',
-                      obscure: _obscureCurrent,
-                      onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent),
-                      validator: (v) => v!.isEmpty ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 16),
+                    // Not asked again when the temporary password was just used to sign in
+                    if (!_knowsTemporary) ...[
+                      _PasswordField(
+                        controller: _currentCtrl,
+                        label: widget.isSettings ? 'Current Password' : 'Temporary Password (from email)',
+                        obscure: _obscureCurrent,
+                        onToggle: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                        validator: (v) => v!.isEmpty ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     _PasswordField(
                       controller: _newCtrl,
                       label: 'New Password',

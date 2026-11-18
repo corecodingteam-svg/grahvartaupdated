@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import 'auth/login_screen.dart';
+import 'auth/change_password_screen.dart';
 import 'onboarding/onboarding_screen.dart';
 import 'astrologer/astrologer_main_screen.dart';
 
@@ -92,7 +93,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       if (!mounted) return;
       dest = !isLoggedIn
           ? const LoginScreen(isAstrologerMode: true)
-          : const AstrologerMainScreen();
+          // Closed the app before setting a new password? That step is still mandatory.
+          : (auth.user?.mustChangePassword == true ? const ChangePasswordScreen() : const AstrologerMainScreen());
     }
 
     // Always show splash for at least 3s total
