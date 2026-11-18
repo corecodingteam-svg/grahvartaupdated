@@ -19,7 +19,7 @@ class AstrologerProfileScreen extends StatefulWidget {
 }
 
 class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
   late AnimationController _heroController;
   late AnimationController _contentController;
@@ -47,10 +47,28 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
     socket.on('astrologer_offline', _onOffline);
     socket.on('astrologer_availability', _onAvailability);
     socket.connect(); // no-op when already connected; needed for live status
-    // Fresh snapshot in case the list we came from is stale
+    socket.connection.addListener(_onConnectionChanged);
+    WidgetsBinding.instance.addObserver(this);
+    _refreshStatus(); // fresh snapshot in case the list we came from is stale
+  }
+
+  void _refreshStatus() {
     ApiService.getAstrologer(_astro.id).then((a) {
       if (mounted) setState(() => _astro = a);
     }).catchError((_) {});
+  }
+
+  // Status may have changed while we were disconnected / in the background
+  void _onConnectionChanged() {
+    if (SocketService.instance.connection.value) _refreshStatus();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      SocketService.instance.ensureConnected();
+      _refreshStatus();
+    }
   }
 
   @override
@@ -83,6 +101,8 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
     socket.offHandler('astrologer_online', _onOnline);
     socket.offHandler('astrologer_offline', _onOffline);
     socket.offHandler('astrologer_availability', _onAvailability);
+    socket.connection.removeListener(_onConnectionChanged);
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     _heroController.dispose();
     _contentController.dispose();

@@ -11,6 +11,21 @@ class SocketService {
   VoidCallback? _onReconnect;
   bool get isConnected => _socket?.connected ?? false;
 
+  /// Live connection state — true while the realtime connection is up.
+  /// The astrologer's "Online" only reaches users while this is true.
+  final ValueNotifier<bool> connection = ValueNotifier<bool>(false);
+
+  /// Make sure a connection exists and is up; safe to call often (heartbeat,
+  /// app resume). Never gives up — fixes sockets that stayed dead after the
+  /// phone slept or the network dropped for a while.
+  Future<void> ensureConnected() async {
+    if (_socket == null) {
+      await connect(role: _role, onReconnect: _onReconnect);
+    } else if (!(_socket!.connected)) {
+      _socket!.connect();
+    }
+  }
+
   String _role = 'user';
 
   // Listeners registered before the socket object is created are buffered here
@@ -44,9 +59,9 @@ class SocketService {
           .setTransports(['websocket'])
           .disableAutoConnect()
           .enableReconnection()
-          .setReconnectionAttempts(20)
-          .setReconnectionDelay(3000)
-          .setReconnectionDelayMax(30000)
+          .setReconnectionAttempts(1 << 30) // keep retrying for as long as the app runs
+          .setReconnectionDelay(2000)
+          .setReconnectionDelayMax(10000)
           .setAuth({'token': token})
           .setTimeout(30000)
           .build(),
@@ -62,6 +77,7 @@ class SocketService {
 
     _socket!.onConnect((_) {
       debugPrint('Socket connected as $_role');
+      connection.value = true;
       _socket!.emit('set_role', {'role': _role});
       onConnected?.call();
     });
@@ -72,7 +88,12 @@ class SocketService {
       _onReconnect?.call();
     });
 
-    _socket!.onDisconnect((reason) => debugPrint('Socket disconnected: $reason'));
+    _socket!.onDisconnect((reason) {
+      debugPrint('Socket disconnected: $reason');
+      connection.value = false;
+      // A server-initiated disconnect is not retried automatically by socket.io
+      if (reason == 'io server disconnect') Future.delayed(const Duration(seconds: 2), () => _socket?.connect());
+    });
     _socket!.onConnectError((e) => debugPrint('Socket connect error: $e'));
     _socket!.on('connect_timeout', (_) => debugPrint('Socket connect timeout'));
 
@@ -84,6 +105,7 @@ class SocketService {
   void reset() {
     _socket?.dispose();
     _socket = null;
+    connection.value = false;
     _pendingListeners.clear();
   }
 

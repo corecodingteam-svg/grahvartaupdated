@@ -11,7 +11,13 @@ class MarketplaceCubit extends Cubit<MarketplaceState> {
     socket.on('astrologer_online', _onOnline);
     socket.on('astrologer_offline', _onOffline);
     socket.on('astrologer_availability', _onAvailability);
+    socket.connection.addListener(_onConnectionChanged);
     socket.connect();
+  }
+
+  // Missed presence events while disconnected — reload the list on reconnect
+  void _onConnectionChanged() {
+    if (!isClosed && SocketService.instance.connection.value) _reloadFromCurrent();
   }
 
   late final Function(dynamic) _onOnline = (d) => _applyPresence(d, true);
@@ -37,6 +43,7 @@ class MarketplaceCubit extends Cubit<MarketplaceState> {
     socket.offHandler('astrologer_online', _onOnline);
     socket.offHandler('astrologer_offline', _onOffline);
     socket.offHandler('astrologer_availability', _onAvailability);
+    socket.connection.removeListener(_onConnectionChanged);
     return super.close();
   }
 

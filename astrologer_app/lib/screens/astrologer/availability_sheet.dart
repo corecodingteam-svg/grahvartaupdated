@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
 
 /// Bottom sheet version of [AvailabilityPanel] (opened from the app-bar pill).
@@ -97,11 +98,18 @@ class _AvailabilityPanelState extends State<AvailabilityPanel> {
       const SizedBox(height: 4),
       Text('Choose how users can reach you right now', style: TextStyle(color: context.clr.txtMuted, fontSize: 13)),
       const SizedBox(height: 8),
-      row(
-        key: 'online', icon: online ? Icons.wifi_tethering : Icons.wifi_tethering_off,
-        title: online ? 'Online' : 'Offline',
-        subtitle: online ? 'You are visible and can receive requests' : 'You will not receive any requests',
-        value: online, color: context.clr.success,
+      ValueListenableBuilder<bool>(
+        valueListenable: SocketService.instance.connection,
+        builder: (context, connected, _) => row(
+          key: 'online', icon: online ? Icons.wifi_tethering : Icons.wifi_tethering_off,
+          title: online ? (connected ? 'Online' : 'Connecting…') : 'Offline',
+          subtitle: !online
+              ? 'You will not receive any requests'
+              : connected
+                  ? 'You are visible and can receive requests'
+                  : 'No connection — users see you as offline until the app reconnects',
+          value: online, color: online && !connected ? Colors.orange : context.clr.success,
+        ),
       ),
       Divider(color: context.clr.border, height: 8),
       row(key: 'chat', icon: Icons.chat_bubble_outline_rounded, title: 'Chat', subtitle: '₹${a.perMinuteRateChat.toInt()}/min', value: a.isChatAvailable, enabled: online),

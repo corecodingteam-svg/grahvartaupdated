@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import 'astrologer_own_profile_screen.dart';
 import 'astrologer_earnings_screen.dart';
+import '../../services/socket_service.dart';
 import 'availability_sheet.dart';
 import 'week_earnings_card.dart';
 
@@ -67,23 +68,32 @@ class _AstrologerDashboardView extends StatelessWidget {
                 GestureDetector(
                   // Opens Online/Offline + separate chat / voice / video switches
                   onTap: state.toggling ? null : () => showAvailabilitySheet(context),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: astrologer.isAvailable ? context.clr.success.withValues(alpha: 0.2) : context.clr.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: astrologer.isAvailable ? context.clr.success : context.clr.border),
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(astrologer.isAvailable ? Icons.toggle_on_rounded : Icons.toggle_off_rounded,
-                        color: astrologer.isAvailable ? context.clr.success : context.clr.txtMuted, size: 18),
-                      const SizedBox(width: 4),
-                      Text(astrologer.isAvailable ? 'Online' : 'Offline',
-                        style: TextStyle(
-                          color: astrologer.isAvailable ? context.clr.success : context.clr.txtMuted,
-                          fontSize: 12, fontWeight: FontWeight.w600)),
-                    ]),
+                  // Users only see "online" when the switch is on AND the app is
+                  // connected — show that truthfully instead of just the switch.
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: SocketService.instance.connection,
+                    builder: (context, connected, _) {
+                      final on = astrologer.isAvailable;
+                      final reconnecting = on && !connected;
+                      final color = reconnecting ? Colors.orange : (on ? context.clr.success : context.clr.txtMuted);
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: on ? color.withValues(alpha: 0.2) : context.clr.surface,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: on ? color : context.clr.border),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          reconnecting
+                              ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: color))
+                              : Icon(on ? Icons.toggle_on_rounded : Icons.toggle_off_rounded, color: color, size: 18),
+                          const SizedBox(width: 4),
+                          Text(reconnecting ? 'Connecting…' : (on ? 'Online' : 'Offline'),
+                            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+                        ]),
+                      );
+                    },
                   ),
                 ),
               IconButton(

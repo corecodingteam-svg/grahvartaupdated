@@ -15,7 +15,7 @@ const offlineTimers = new Map();     // astrologerId -> pending "go offline" tim
 // device, the web portal). Every astrologer socket joins this room; the
 // astrologer is "connected" while the room is non-empty.
 const astroRoom = (astrologerId) => `astrologer:${astrologerId}`;
-const OFFLINE_GRACE_MS = 8000; // ride out quick reconnects without flickering offline
+const OFFLINE_GRACE_MS = 15000; // ride out quick reconnects (mobile networks, app switching) without flickering offline
 
 const isOnHold = (holdUntil) => !!(holdUntil && new Date(holdUntil).getTime() > Date.now());
 

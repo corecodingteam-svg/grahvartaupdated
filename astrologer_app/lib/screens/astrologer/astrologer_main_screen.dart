@@ -23,7 +23,7 @@ class AstrologerMainScreen extends StatefulWidget {
   State<AstrologerMainScreen> createState() => _AstrologerMainScreenState();
 }
 
-class _AstrologerMainScreenState extends State<AstrologerMainScreen> with SingleTickerProviderStateMixin {
+class _AstrologerMainScreenState extends State<AstrologerMainScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final AudioPlayer _ringtonePlayer = AudioPlayer();
   late final AnimationController _overlayCtrl;
   late final Animation<double> _overlayScale;
@@ -37,6 +37,7 @@ class _AstrologerMainScreenState extends State<AstrologerMainScreen> with Single
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _cubit = MainScreenCubit();
     _screens = [
       const AstrologerDashboardScreen(),
@@ -52,7 +53,23 @@ class _AstrologerMainScreenState extends State<AstrologerMainScreen> with Single
   }
 
   @override
+  /// Back in the app (after sleep / background): reconnect at once and
+  /// re-announce presence so users see this astrologer online again.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final socket = SocketService.instance;
+      if (socket.isConnected) {
+        socket.emit('set_role', {'role': 'astrologer'});
+      } else {
+        socket.ensureConnected();
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _heartbeatTimer?.cancel();
     _overlayCtrl.dispose();
     SocketService.instance.off('new_consultation_request');
@@ -91,8 +108,11 @@ class _AstrologerMainScreenState extends State<AstrologerMainScreen> with Single
     });
 
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (SocketService.instance.isConnected) {
-        SocketService.instance.emit('set_role', {'role': 'astrologer'});
+      final socket = SocketService.instance;
+      if (socket.isConnected) {
+        socket.emit('set_role', {'role': 'astrologer'});
+      } else {
+        socket.ensureConnected(); // the connection died — bring it back
       }
     });
   }
