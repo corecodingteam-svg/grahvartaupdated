@@ -69,6 +69,7 @@ dependencies:
   cupertino_icons: ^1.0.2
   pinenacl: ^0.6.0
   cryptography: ^2.7.0
+  vibration: ^3.2.1
 
 
 dev_dependencies:
@@ -90,6 +91,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/sounds/
     - assets/fonts/
     - assets/lottie/
 

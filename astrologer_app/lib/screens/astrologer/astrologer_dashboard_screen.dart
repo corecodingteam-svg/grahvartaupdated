@@ -9,6 +9,7 @@ import 'astrologer_own_profile_screen.dart';
 import '../../services/socket_service.dart';
 import 'availability_sheet.dart';
 import 'week_earnings_card.dart';
+import 'performance_screen.dart';
 
 class AstrologerDashboardScreen extends StatelessWidget {
   const AstrologerDashboardScreen({super.key});
@@ -123,6 +124,8 @@ class _AstrologerDashboardView extends StatelessWidget {
                             child: const AvailabilityPanel(),
                           ),
                         WeekEarningsCard(earningsChart: state.data?['earnings_chart'] as List<dynamic>?),
+                        _performanceCard(context),
+                        const SizedBox(height: 20),
                         _buildStats(context, astrologer, state.data),
                         const SizedBox(height: 20),
                         _buildRecentConsultations(context, state.data),
@@ -267,4 +270,30 @@ class _AstrologerDashboardView extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Dashboard shortcut to the detailed performance report.
+Widget _performanceCard(BuildContext context) {
+  return InkWell(
+    borderRadius: BorderRadius.circular(16),
+    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PerformanceScreen())),
+    child: Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: context.clr.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: context.clr.border)),
+      child: Row(children: [
+        Container(
+          width: 44, height: 44,
+          decoration: BoxDecoration(color: context.clr.accent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+          child: Icon(Icons.insights_rounded, color: context.clr.accent),
+        ),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Performance', style: TextStyle(color: context.clr.txtPrimary, fontSize: 15, fontWeight: FontWeight.w600)),
+          Text('Calls, chats, talk time, declines, missed requests and drops',
+              style: TextStyle(color: context.clr.txtMuted, fontSize: 12)),
+        ])),
+        Icon(Icons.chevron_right_rounded, color: context.clr.txtMuted),
+      ]),
+    ),
+  );
 }

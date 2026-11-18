@@ -16,6 +16,16 @@ router.get('/me/blocked-users', authenticate, ctrl.listBlockedUsers);
 router.post('/me/blocked-users/:userId', authenticate, ctrl.blockUser);
 router.delete('/me/blocked-users/:userId', authenticate, ctrl.unblockUser);
 router.get('/threads', authenticate, ctrl.getChatThreads);
+// Astrologer tools: welcome message, remedies, sounds, performance
+const tools = require('../controllers/astrologerToolsController');
+router.get('/me/chat-settings', authenticate, tools.getChatSettings);
+router.put('/me/welcome', authenticate, tools.updateWelcome);
+router.post('/me/remedies', authenticate, tools.createRemedy);
+router.put('/me/remedies/:id', authenticate, tools.updateRemedy);
+router.delete('/me/remedies/:id', authenticate, tools.deleteRemedy);
+router.get('/me/notification-prefs', authenticate, tools.getNotificationPrefs);
+router.put('/me/notification-prefs', authenticate, tools.updateNotificationPrefs);
+router.get('/me/performance', authenticate, tools.getPerformance);
 router.get('/threads/:userId/messages', authenticate, ctrl.getUserThreadMessages);
 
 // Wildcard routes LAST

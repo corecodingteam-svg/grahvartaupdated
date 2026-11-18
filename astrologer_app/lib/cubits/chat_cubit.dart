@@ -52,6 +52,10 @@ class ChatCubit extends Cubit<ChatState> {
   bool get e2e => peerKey != null && ChatCrypto.instance.isReady;
   Map<String, dynamic>? _lastSent; // resent once if a key changed mid-chat
 
+  /// True once the astrologer has said anything in this consultation
+  /// (used so the automatic welcome message is sent only once).
+  bool astrologerHasSpoken = false;
+
   Future<void> refreshPeerKey() async {
     peerKey = await ChatCrypto.instance.peerKey(consultationId);
   }
@@ -97,6 +101,7 @@ class ChatCubit extends Cubit<ChatState> {
 
     try {
       final current = await ApiService.getAstrologerConsultationMessages(consultationId);
+      astrologerHasSpoken = current.any((m) => (m as Map)['sender_type'] == 'astrologer');
       msgs.addAll(current.map((m) {
         final map = ChatCrypto.instance.decodeRow(m as Map);
         map['type'] = map['message_type'] ?? map['type'] ?? 'text';
@@ -126,6 +131,7 @@ class ChatCubit extends Cubit<ChatState> {
 
   void sendTextMessage(String text) {
     if (text.isEmpty || state.isEnded) return;
+    astrologerHasSpoken = true;
     SocketService.instance.sendTypingStop(consultationId);
     _send({'t': 'text', 'b': text}, plain: text);
     addMessage({

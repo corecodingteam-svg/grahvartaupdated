@@ -5,6 +5,7 @@ const { sendPushNotification } = require('../controllers/liveController');
 const { saveMessage, insertSessionDivider } = require('../controllers/threadController');
 const { detectContactInfo, blockedMessageText } = require('../utils/contactFilter');
 const { parseEnvelope, partyKeys } = require('../utils/chatE2e');
+const { recordEnd } = require('../utils/consultationEnd');
 const transcription = require('../utils/transcription');
 
 const billingEngines = new Map(); // consultationId -> BillingEngine
@@ -164,6 +165,7 @@ function initSocket(io) {
           // If stale queued consultation is for a DIFFERENT astrologer, cancel it and proceed fresh
           if (c.status === 'queued' && c.astrologer_id !== astrologer_id) {
             await db.query(`UPDATE consultations SET status='cancelled', ended_at=NOW() WHERE id=$1`, [c.id]);
+            await recordEnd(c.id, 'superseded', 'user');
             await db.query(`UPDATE consultation_queue SET status='cancelled' WHERE consultation_id=$1`, [c.id]);
             await db.query(`UPDATE astrologers SET queue_count=GREATEST(queue_count-1,0) WHERE id=$1`, [c.astrologer_id]);
             console.log(`[existing consultation] cancelled stale queued consultation ${c.id} for different astrologer`);
@@ -292,14 +294,17 @@ function initSocket(io) {
         }
 
         // Always send push notification so astrologer is notified even if app is closed
-        const astroUserResult = await db.query('SELECT user_id FROM astrologers WHERE id = $1', [astrologer_id]);
+        const astroUserResult = await db.query('SELECT user_id, notification_prefs FROM astrologers WHERE id = $1', [astrologer_id]);
         if (astroUserResult.rows.length) {
+          const { requestChannelFor } = require('../controllers/astrologerToolsController');
+          const ch = requestChannelFor(astroUserResult.rows[0].notification_prefs, type);
           const typeLabel = type === 'chat' ? 'Chat' : type === 'voice' ? 'Voice Call' : 'Video Call';
           await sendPushNotification(
             [astroUserResult.rows[0].user_id],
             `New ${typeLabel} Request 🔔`,
             `${socket.user.name} is requesting a ${typeLabel.toLowerCase()} consultation. Open the app to accept.`,
-            { type: 'consultation_request', consultation_id: consultationId }
+            { type: 'consultation_request', consultation_id: consultationId, request_type: type },
+            { astrologerChannelId: ch.channelId, silent: ch.silent }
           );
         }
 
@@ -398,12 +403,15 @@ function initSocket(io) {
 
     // ─── REJECT / DECLINE ────────────────────────────────────────
     socket.on('reject_consultation', async ({ consultation_id }) => {
-      if (!(await partyOf(consultation_id))) return;
+      const party = await partyOf(consultation_id);
+      if (!party) return;
       const r = await db.query(
         `UPDATE consultations SET status='cancelled', ended_at=NOW() WHERE id=$1 AND status='queued' RETURNING astrologer_id`,
         [consultation_id]
       );
       if (!r.rows.length) return;
+      // Astrologer pressing Decline vs. the user withdrawing their request
+      await recordEnd(consultation_id, party === 'astrologer' ? 'declined' : 'cancelled', party);
       await db.query(`UPDATE consultation_queue SET status='cancelled' WHERE consultation_id=$1`, [consultation_id]).catch(() => {});
       await db.query('UPDATE astrologers SET queue_count = GREATEST(queue_count - 1, 0) WHERE id = $1', [r.rows[0].astrologer_id]).catch(() => {});
       io.emitToParties(consultation_id, 'consultation_rejected', { consultation_id });
@@ -579,7 +587,15 @@ function initSocket(io) {
 
     // ─── END CONSULTATION ────────────────────────────────────────
     socket.on('end_consultation', async ({ consultation_id }) => {
-      if (!(await partyOf(consultation_id))) return;
+      const party = await partyOf(consultation_id);
+      if (!party) return;
+      {
+        // Ending a request that was never accepted = declined (astrologer) / cancelled (user)
+        const cur = await db.query('SELECT status FROM consultations WHERE id = $1', [consultation_id]).catch(() => ({ rows: [] }));
+        const st = cur.rows[0]?.status;
+        if (st === 'queued') await recordEnd(consultation_id, party === 'astrologer' ? 'declined' : 'cancelled', party);
+        else if (st === 'active') await recordEnd(consultation_id, 'ended', party);
+      }
       transcription.stop(consultation_id).catch(() => {});
       const engine = billingEngines.get(consultation_id);
       if (engine) {
@@ -736,6 +752,7 @@ function initSocket(io) {
           transcription.stop(socket.consultationId).catch(() => {});
           const engine = billingEngines.get(socket.consultationId);
           if (engine) {
+            await recordEnd(socket.consultationId, 'astrologer_disconnected', 'system');
             const partialSeconds = engine.secondsElapsed % 60;
             if (partialSeconds > 0) {
               const refund = parseFloat(((partialSeconds / 60) * engine.ratePerMinute).toFixed(2));
@@ -758,6 +775,7 @@ function initSocket(io) {
       if (!socket.astrologerId && socket.consultationId) {
         transcription.stop(socket.consultationId).catch(() => {});
         const engine = billingEngines.get(socket.consultationId);
+        await recordEnd(socket.consultationId, 'user_disconnected', 'system');
         if (engine) {
           await engine.stop();
           billingEngines.delete(socket.consultationId);

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:just_audio/just_audio.dart';
 import '../../cubits/main_screen_cubit.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/socket_service.dart';
@@ -15,6 +14,7 @@ import 'astrologer_pending_screen.dart';
 import 'astrologer_consultations_screen.dart';
 import 'astrologer_chat_screen.dart';
 import '../../widgets/chat_pin_sheet.dart';
+import '../../services/sound_service.dart';
 import 'astrologer_call_screen.dart';
 
 class AstrologerMainScreen extends StatefulWidget {
@@ -25,7 +25,6 @@ class AstrologerMainScreen extends StatefulWidget {
 }
 
 class _AstrologerMainScreenState extends State<AstrologerMainScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  final AudioPlayer _ringtonePlayer = AudioPlayer();
   late final AnimationController _overlayCtrl;
   late final Animation<double> _overlayScale;
   late final Animation<double> _overlayFade;
@@ -48,6 +47,7 @@ class _AstrologerMainScreenState extends State<AstrologerMainScreen> with Single
       const AstrologerCommunityScreen(),
     ];
     _overlayCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
+    SoundService.instance.load();
     // Set up / unlock encrypted chat once at start, so accepting a chat later is instant
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) ensureChatUnlocked(context);
@@ -81,7 +81,7 @@ class _AstrologerMainScreenState extends State<AstrologerMainScreen> with Single
     SocketService.instance.off('consultation_started');
     SocketService.instance.off('consultation_ended');
     SocketService.instance.off('consultation_rejected');
-    _ringtonePlayer.dispose();
+    SoundService.instance.stopRinging();
     _cubit.close();
     super.dispose();
   }
@@ -93,7 +93,7 @@ class _AstrologerMainScreenState extends State<AstrologerMainScreen> with Single
       if (!mounted) return;
       _cubit.setIncomingRequest(Map<String, dynamic>.from(data as Map));
       _overlayCtrl.forward(from: 0);
-      _playRingtone();
+      _playRingtone(data['type']?.toString() ?? 'chat');
     });
 
     socket.on('consultation_started', (data) {
@@ -136,19 +136,10 @@ class _AstrologerMainScreenState extends State<AstrologerMainScreen> with Single
     return true;
   }
 
-  Future<void> _playRingtone() async {
-    try {
-      await _ringtonePlayer.setAsset('assets/images/ringtone.mp3');
-      await _ringtonePlayer.setLoopMode(LoopMode.one);
-      await _ringtonePlayer.play();
-    } catch (_) {}
-  }
+  // Ringtone + vibration chosen in Settings → Sounds & vibration
+  Future<void> _playRingtone([String type = 'chat']) => SoundService.instance.startRinging(type);
 
-  Future<void> _stopRingtone() async {
-    try {
-      await _ringtonePlayer.stop();
-    } catch (_) {}
-  }
+  Future<void> _stopRingtone() => SoundService.instance.stopRinging();
 
   Future<void> _acceptRequest(Map<String, dynamic> req) async {
     _stopRingtone();

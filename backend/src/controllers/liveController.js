@@ -41,12 +41,14 @@ const _channelIdByApp = {
   astrologer_app: 'grahvarta_astrology_high_importance',
 };
 
-async function _sendToTokens(messagingInstance, tokenList, title, body, data, appLabel) {
+async function _sendToTokens(messagingInstance, tokenList, title, body, data, appLabel, opts = {}) {
   if (!messagingInstance || !tokenList.length) {
     console.log(`[FCM][${appLabel}] Skipping — no instance or no tokens (tokens=${tokenList.length}, instance=${!!messagingInstance})`);
     return;
   }
-  const channelId = _channelIdByApp[appLabel] || 'grahvarta_high_importance';
+  // The astrologer app can pick its ringtone per request type (its own Android channels)
+  const channelId = (appLabel === 'astrologer_app' && opts.astrologerChannelId) || _channelIdByApp[appLabel] || 'grahvarta_high_importance';
+  const sound = appLabel === 'astrologer_app' && opts.silent ? undefined : 'default';
   const stringData = {};
   for (const [k, v] of Object.entries({ ...data })) {
     stringData[k] = v == null ? '' : String(v);
@@ -55,8 +57,8 @@ async function _sendToTokens(messagingInstance, tokenList, title, body, data, ap
     tokens: tokenList,
     notification: { title, body },
     data: stringData,
-    android: { priority: 'high', notification: { channelId, priority: 'high', sound: 'default' } },
-    apns: { payload: { aps: { sound: 'default', contentAvailable: true } } },
+    android: { priority: 'high', notification: { channelId, priority: 'high', ...(sound ? { sound } : {}) } },
+    apns: { payload: { aps: { ...(sound ? { sound } : {}), contentAvailable: true } } },
   };
   console.log(`[FCM][${appLabel}] Sending to ${tokenList.length} token(s): title="${title}" data=${JSON.stringify(stringData)}`);
   try {
@@ -86,7 +88,7 @@ async function _sendToTokens(messagingInstance, tokenList, title, body, data, ap
   }
 }
 
-async function sendPushNotification(userIds, title, body, data = {}) {
+async function sendPushNotification(userIds, title, body, data = {}, opts = {}) {
   const type = data.type || 'general';
   console.log(`[FCM] sendPushNotification: userIds=${JSON.stringify(userIds)} title="${title}" type=${type}`);
 
@@ -126,7 +128,7 @@ async function sendPushNotification(userIds, title, body, data = {}) {
 
     await Promise.all([
       _sendToTokens(userAppFcm, userTokens, title, body, data, 'user_app'),
-      _sendToTokens(astrologerAppFcm, astrologerTokens, title, body, data, 'astrologer_app'),
+      _sendToTokens(astrologerAppFcm, astrologerTokens, title, body, data, 'astrologer_app', opts),
     ]);
   } catch (err) {
     console.error('[FCM] sendPushNotification error:', err);

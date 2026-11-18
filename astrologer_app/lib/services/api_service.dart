@@ -490,6 +490,46 @@ class ApiService {
     final r = await http.get(Uri.parse(url), headers: await _headers(auth: true));
     return await _handle(r);
   }
+
+  // ── Astrologer tools ──────────────────────────────────────────
+  static Future<Map<String, dynamic>> getChatSettings() async {
+    final r = await http.get(Uri.parse('$baseUrl/astrologers/me/chat-settings'), headers: await _headers(auth: true));
+    return _handle(r);
+  }
+
+  static Future<Map<String, dynamic>> updateWelcome({required bool enabled, required String message}) async {
+    final r = await http.put(Uri.parse('$baseUrl/astrologers/me/welcome'), headers: await _headers(auth: true),
+        body: jsonEncode({'welcome_enabled': enabled, 'welcome_message': message}));
+    return _handle(r);
+  }
+
+  static Future<Map<String, dynamic>> saveRemedy({String? id, required String title, required String body}) async {
+    final payload = jsonEncode({'title': title, 'body': body});
+    final r = id == null
+        ? await http.post(Uri.parse('$baseUrl/astrologers/me/remedies'), headers: await _headers(auth: true), body: payload)
+        : await http.put(Uri.parse('$baseUrl/astrologers/me/remedies/$id'), headers: await _headers(auth: true), body: payload);
+    return _handle(r);
+  }
+
+  static Future<Map<String, dynamic>> deleteRemedy(String id) async {
+    final r = await http.delete(Uri.parse('$baseUrl/astrologers/me/remedies/$id'), headers: await _headers(auth: true));
+    return _handle(r);
+  }
+
+  static Future<Map<String, dynamic>> getNotificationPrefs() async {
+    final r = await http.get(Uri.parse('$baseUrl/astrologers/me/notification-prefs'), headers: await _headers(auth: true));
+    return _handle(r);
+  }
+
+  static Future<Map<String, dynamic>> updateNotificationPrefs(Map<String, dynamic> prefs) async {
+    final r = await http.put(Uri.parse('$baseUrl/astrologers/me/notification-prefs'), headers: await _headers(auth: true), body: jsonEncode(prefs));
+    return _handle(r);
+  }
+
+  static Future<Map<String, dynamic>> getPerformance(int days) async {
+    final r = await http.get(Uri.parse('$baseUrl/astrologers/me/performance?days=$days'), headers: await _headers(auth: true));
+    return _handle(r);
+  }
 }
 
 class ApiException implements Exception {

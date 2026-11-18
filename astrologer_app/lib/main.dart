@@ -53,9 +53,23 @@ Future<void> _initLocalNotifications() async {
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
     ),
   );
-  await localNotifs
-      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(_channel);
+  final android = localNotifs.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+  await android?.createNotificationChannel(_channel);
+  // One channel per ringtone + vibration choice for incoming request pushes.
+  // The server picks the channel from the astrologer's Sounds & vibration settings.
+  for (final sound in const ['classic', 'temple_bell', 'soft_chime', 'marimba', 'digital', 'silent']) {
+    for (final vibrate in const [true, false]) {
+      await android?.createNotificationChannel(AndroidNotificationChannel(
+        'astro_req_${sound}_${vibrate ? 'v1' : 'v0'}',
+        'Requests · ${sound.replaceAll('_', ' ')}${vibrate ? '' : ' (no vibration)'}',
+        description: 'Incoming chat and call requests',
+        importance: Importance.max,
+        playSound: sound != 'silent',
+        sound: sound == 'silent' ? null : RawResourceAndroidNotificationSound(sound),
+        enableVibration: vibrate,
+      ));
+    }
+  }
 }
 
 void _handleAstrologerStatusNotification(String type, String? reason, BuildContext? context) {
@@ -117,6 +131,9 @@ void _listenForegroundMessages(BuildContext context) {
       _handleAstrologerStatusNotification(type!, message.data['reason'], context);
       return;
     }
+
+    // Incoming requests ring inside the app (Sounds & vibration settings) — no extra banner sound
+    if (type == 'consultation_request') return;
 
     // Show notification for both notification-messages and data-only messages
     final title = notification?.title ?? message.data['title'];

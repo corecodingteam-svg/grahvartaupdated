@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ringtones are referenced only by notification channels at runtime; keep them in release builds -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@raw/classic,@raw/temple_bell,@raw/soft_chime,@raw/marimba,@raw/digital" />

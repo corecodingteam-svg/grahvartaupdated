@@ -1,3 +1,4 @@
+const { recordEnd } = require('../utils/consultationEnd');
 /**
  * Per-minute billing engine for live consultations.
  * Deducts from user wallet every 60 seconds and credits astrologer.
@@ -41,6 +42,7 @@ class BillingEngine {
     // Check inactivity
     if (Date.now() - this.lastActivityAt > this.INACTIVITY_TIMEOUT_MS) {
       console.log(`Consultation ${this.consultationId} ended due to inactivity`);
+      await recordEnd(this.consultationId, 'inactivity', 'system');
       const duration = this.secondsElapsed;
       const total = this.totalCharged;
       await this.stop();
@@ -84,6 +86,7 @@ class BillingEngine {
 
       if (!walletResult.rows.length || walletResult.rows[0].balance < this.ratePerMinute) {
         // Insufficient balance — refund last partial minute and end session
+        await recordEnd(this.consultationId, 'insufficient_balance', 'system');
         if (this.secondsElapsed % 60 !== 0 && this.totalCharged > 0) {
           const partialSeconds = this.secondsElapsed % 60;
           const partialCharge = parseFloat(((partialSeconds / 60) * this.ratePerMinute).toFixed(2));

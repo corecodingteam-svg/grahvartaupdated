@@ -11,6 +11,9 @@ import '../../theme/app_theme.dart';
 import '../auth/login_screen.dart';
 import '../auth/change_password_screen.dart';
 import 'astrologer_earnings_screen.dart';
+import 'performance_screen.dart';
+import '../settings/sound_settings_screen.dart';
+import '../settings/chat_tools_screen.dart';
 
 
 class AstrologerOwnProfileScreen extends StatelessWidget {
@@ -401,6 +404,30 @@ class _AstrologerOwnProfileViewState extends State<_AstrologerOwnProfileView> {
           title: 'Change Password',
           subtitle: 'Update your account password',
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen(isSettings: true))),
+        ),
+        const SizedBox(height: 4),
+        _buildSettingsTile(
+          context,
+          icon: Icons.notifications_active_outlined,
+          title: 'Sounds & vibration',
+          subtitle: 'Ringtones for requests and messages',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SoundSettingsScreen())),
+        ),
+        const SizedBox(height: 4),
+        _buildSettingsTile(
+          context,
+          icon: Icons.waving_hand_outlined,
+          title: 'Welcome & remedies',
+          subtitle: 'Auto welcome message and saved remedies',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatToolsScreen())),
+        ),
+        const SizedBox(height: 4),
+        _buildSettingsTile(
+          context,
+          icon: Icons.insights_rounded,
+          title: 'Performance',
+          subtitle: 'Detailed report of your consultations',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PerformanceScreen())),
         ),
         const SizedBox(height: 4),
         _buildSettingsTile(

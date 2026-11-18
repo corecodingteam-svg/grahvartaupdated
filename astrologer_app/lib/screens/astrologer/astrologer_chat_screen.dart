@@ -9,6 +9,8 @@ import '../../theme/app_theme.dart';
 import '../../widgets/secure_chat_notice.dart';
 import '../../widgets/chat_pin_sheet.dart';
 import '../../widgets/encrypted_image.dart';
+import '../../services/chat_tools_service.dart';
+import '../../services/sound_service.dart';
 import '../../utils/block_user.dart';
 import '../../utils/contact_filter.dart';
 
@@ -49,6 +51,99 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
     await _cubit.loadHistory();
     if (mounted) setState(() {});
     _scrollBottom();
+    _sendWelcomeIfNeeded();
+  }
+
+  /// Sends the astrologer's saved welcome message once, as soon as the chat
+  /// starts (Settings → Welcome & remedies).
+  Future<void> _sendWelcomeIfNeeded() async {
+    try {
+      final tools = await ChatToolsService.instance.load();
+      if (!mounted || !tools.welcomeEnabled || tools.welcomeMessage.trim().isEmpty) return;
+      if (_cubit.state.isEnded || _cubit.astrologerHasSpoken) return;
+      final text = ChatToolsService.fillWelcome(tools.welcomeMessage, userName: widget.userName, astrologerName: '');
+      if (ContactFilter.detect(text).isNotEmpty) return; // never auto-send contact details
+      _cubit.sendTextMessage(text);
+      _scrollBottom();
+    } catch (_) {}
+  }
+
+  /// Remedy picker: tap a saved remedy to send it to the user.
+  Future<void> _showRemedies() async {
+    if (_cubit.state.isEnded) return;
+    List<Remedy> remedies;
+    try {
+      remedies = (await ChatToolsService.instance.load(force: true)).remedies;
+    } catch (e) {
+      _showRuleSnack('Could not load remedies: $e');
+      return;
+    }
+    if (!mounted) return;
+    final picked = await showModalBottomSheet<Remedy>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.clr.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.7),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+              child: Text('Send a remedy', style: TextStyle(color: ctx.clr.txtPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Text('Tap one to send it to ${widget.userName}.', style: TextStyle(color: ctx.clr.txtMuted, fontSize: 12)),
+            ),
+            if (remedies.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                child: Text('No saved remedies yet. Add them in Profile → Settings → Welcome & remedies.',
+                    style: TextStyle(color: ctx.clr.txtSecondary, height: 1.4)),
+              )
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  itemCount: remedies.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (_, i) {
+                    final r = remedies[i];
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => Navigator.pop(ctx, r),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(color: ctx.clr.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: ctx.clr.border)),
+                        child: Row(children: [
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(r.title, style: TextStyle(color: ctx.clr.txtPrimary, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 4),
+                            Text(r.body, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(color: ctx.clr.txtMuted, fontSize: 12, height: 1.35)),
+                          ])),
+                          const SizedBox(width: 8),
+                          Icon(Icons.send_rounded, color: ctx.clr.accent, size: 20),
+                        ]),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ]),
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    final text = '🌿 ${picked.title}\n\n${picked.body}';
+    final detected = ContactFilter.detect(text);
+    if (detected.isNotEmpty) {
+      _showRuleSnack(ContactFilter.blockedMessage(detected));
+      return;
+    }
+    _cubit.sendTextMessage(text);
+    _scrollBottom();
   }
 
   @override
@@ -74,6 +169,7 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
       if (msg['sender_type'] == 'astrologer') return;
       final normalized = {...msg, 'type': msg['message_type'] ?? msg['type'] ?? 'text'};
       _cubit.addMessage(normalized);
+      SoundService.instance.playMessage(); // Settings → Sounds & vibration
       _scrollBottom();
     });
     socket.on('billing_tick', (data) {
@@ -500,6 +596,11 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
         IconButton(
           icon: Icon(Icons.add_circle_outline, color: context.clr.txtMuted),
           onPressed: _showImageOptions,
+        ),
+        IconButton(
+          tooltip: 'Send a remedy',
+          icon: Icon(Icons.spa_outlined, color: context.clr.accent),
+          onPressed: _showRemedies,
         ),
         Expanded(
           child: TextField(

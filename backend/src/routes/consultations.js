@@ -17,6 +17,7 @@ const isAllowedImage = (file) =>
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const { authenticate } = require('../middleware/auth');
+const { recordEnd } = require('../utils/consultationEnd');
 
 const uploadDir = path.join(__dirname, '../../uploads/chat');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -100,6 +101,7 @@ router.get('/history', authenticate, async (req, res) => {
 
 router.patch('/:id/end', authenticate, async (req, res) => {
   try {
+    await recordEnd(req.params.id, 'ended', 'user');
     await db.query(
       `UPDATE consultations SET status = 'completed', ended_at = NOW() WHERE id = $1 AND user_id = $2 AND status != 'completed'`,
       [req.params.id, req.user.id]

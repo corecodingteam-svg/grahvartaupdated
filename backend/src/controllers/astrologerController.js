@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { recordEnd } = require('../utils/consultationEnd');
 
 exports.listAstrologers = async (req, res) => {
   try {
@@ -263,6 +264,7 @@ exports.blockUser = async (req, res) => {
     for (const c of open.rows) {
       if (c.status === 'queued') {
         await db.query(`UPDATE consultations SET status = 'cancelled', ended_at = NOW() WHERE id = $1`, [c.id]);
+        await recordEnd(c.id, 'blocked', 'astrologer');
         await db.query(`UPDATE consultation_queue SET status = 'cancelled' WHERE consultation_id = $1`, [c.id]);
         await db.query('UPDATE astrologers SET queue_count = GREATEST(queue_count - 1, 0) WHERE id = $1', [astroId]);
         req.io?.to(`consultation:${c.id}`).emit('consultation_rejected', { consultation_id: c.id, reason: 'blocked' });
