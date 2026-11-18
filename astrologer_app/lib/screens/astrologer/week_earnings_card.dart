@@ -18,8 +18,8 @@ class _WeekEarningsCardState extends State<WeekEarningsCard> {
   int? _touched;
 
   // Single series → one hue. Validated against the card surface in each mode
-  // (light #027DFD on #F0F6FF, dark #D96A20 on #1E1E1E).
-  static const _barLight = Color(0xFF027DFD);
+  // (light saffron #D9661C on white, dark #D96A20 on #1E1E1E).
+  static const _barLight = Color(0xFFD9661C); // saffron, 3.6:1 on the white card
   static const _barDark = Color(0xFFD96A20);
 
   static final _rupee = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);

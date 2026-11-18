@@ -73,23 +73,24 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final s = context.s;
     final isAstro = widget.isAstrologerMode;
-    const astroBlue = Color(0xFF027DFD);
-    final accentColor = isAstro ? astroBlue : context.clr.accent;
+    final accentColor = context.clr.accent;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isAstro
-                ? isDark
-                    ? [const Color(0xFF0D1A3A), const Color(0xFF0D0D0D)]
-                    : [const Color(0xFFE6F0FF), const Color(0xFFFFFFFF)]
-                : [context.clr.surface, context.clr.bg],
-          ),
+          // Solid page colour in light mode (website background); dark keeps its gradient
+          color: isDark ? null : context.clr.bg,
+          gradient: isDark
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: isAstro
+                      ? [const Color(0xFF0D1A3A), const Color(0xFF0D0D0D)]
+                      : [context.clr.surface, context.clr.bg],
+                )
+              : null,
         ),
         child: SafeArea(
           child: SingleChildScrollView(

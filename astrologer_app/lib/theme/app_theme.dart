@@ -21,28 +21,29 @@ class AppColors {
   static const Color success = Color(0xFF43A047);
 }
 
-// Light theme Flutter color palette
+// Light theme palette — taken from the GrahVarta website's light theme
+// (grahvarta-web/src/index.css + tailwind.config.js): warm whites and creams,
+// warm-brown text, saffron brand colour.
 class LightColors {
-  static const Color background = Color(0xFFFFFFFF);
-  static const Color surface = Color(0xFFEEF4FF);
-  static const Color surfaceLight = Color(0xFFE5EEFF);
-  static const Color card = Color(0xFFF0F6FF);
-  static const Color flutterNavy = Color(0xFF042B59);
-  static const Color flutterBlue = Color(0xFF0553B1);
-  static const Color flutterSky = Color(0xFF027DFD);
-  static const Color red = Color(0xFFF25D50);
-  static const Color yellow = Color(0xFFFFF275);
-  static const Color purple = Color(0xFF6200EE);
-  static const Color green = Color(0xFF1CDAC5);
+  static const Color background = Color(0xFFFFFDF7);   // page (website body gradient #FFFFFF → #FFFCEA)
+  static const Color surface = Color(0xFFFFFFFF);      // app bars, sheets, nav bar
+  static const Color surfaceLight = Color(0xFFFFFBED); // inputs, chips, subtle fills (website surface-light)
+  static const Color card = Color(0xFFFFFFFF);         // cards on the cream page
+  static const Color saffron = Color(0xFFD9661C);      // buttons, switches, active states, charts
+                                                       // (brand #E8762A deepened just enough for white text ≥ 3:1)
+  static const Color saffronDeep = Color(0xFFB85C1A);  // accent text & links (website orange-dark, 4.6:1 on white)
+  static const Color brandOrange = Color(0xFFE8762A);  // website brand orange, for decorative use
+  static const Color saffronSoft = Color(0xFFFAEDE4);  // solid fill for secondary buttons (saffronDeep text 4:1)
+  static const Color gold = Color(0xFFD4A843);
+  static const Color maroon = Color(0xFF6B2A0E);       // deep brand maroon (logo ring)
   static const Color white = Color(0xFFFFFFFF);
-  static const Color textPrimary = Color(0xFF042B59);
-  static const Color textSecondary = Color(0xFF0553B1);
-  static const Color textMuted = Color(0xFF666666);
-  static const Color border = Color(0xFFC8D8F0);
-  static const Color divider = Color(0xFFD5E5F5);
-  static const Color error = Color(0xFFF25D50);
-  static const Color success = Color(0xFF1CDAC5);
-  static const Color orange = Color(0xFFE8762A);
+  static const Color textPrimary = Color(0xFF211810);  // website text-primary
+  static const Color textSecondary = Color(0xFF5C4430);// website text-secondary
+  static const Color textMuted = Color(0xFF786C62);    // website text-muted
+  static const Color border = Color(0xFFEFE4C6);       // website border #F6F0DA, slightly stronger so cards read on cream
+  static const Color divider = Color(0xFFF4ECD5);
+  static const Color error = Color(0xFFE53935);        // website error
+  static const Color success = Color(0xFF2BA05A);      // website success
 }
 
 /// Context extension — use `context.clr.bg`, `context.clr.txtPrimary`, etc.
@@ -64,11 +65,11 @@ class AppColorSet {
   Color get txtMuted    => _dark ? AppColors.textMuted    : LightColors.textMuted;
   Color get border      => _dark ? AppColors.border       : LightColors.border;
   Color get divider     => _dark ? AppColors.divider      : LightColors.divider;
-  Color get accent      => _dark ? AppColors.orange       : LightColors.flutterSky;
-  Color get accentAlt   => _dark ? AppColors.gold         : LightColors.flutterBlue;
+  Color get accent      => _dark ? AppColors.orange       : LightColors.saffron;
+  Color get accentAlt   => _dark ? AppColors.gold         : LightColors.saffronDeep;
   Color get error       => _dark ? AppColors.error        : LightColors.error;
   Color get success     => _dark ? AppColors.success      : LightColors.success;
-  Color get navy        => _dark ? AppColors.orange       : LightColors.flutterNavy;
+  Color get navy        => _dark ? AppColors.orange       : LightColors.maroon;
 }
 
 class AppTheme {
@@ -178,8 +179,8 @@ class AppTheme {
       brightness: Brightness.light,
       scaffoldBackgroundColor: LightColors.background,
       colorScheme: const ColorScheme.light(
-        primary: LightColors.flutterSky,
-        secondary: LightColors.flutterBlue,
+        primary: LightColors.saffron,
+        secondary: LightColors.saffronDeep,
         surface: LightColors.surface,
         error: LightColors.error,
         onPrimary: LightColors.white,
@@ -201,38 +202,50 @@ class AppTheme {
           bodySmall: TextStyle(color: LightColors.textMuted, fontSize: 12),
         ),
       ),
+      // Light header like the website: white bar, dark warm text, no tint on scroll
       appBarTheme: const AppBarTheme(
-        backgroundColor: LightColors.flutterSky,
+        backgroundColor: LightColors.surface,
+        foregroundColor: LightColors.textPrimary,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0.5,
+        shadowColor: LightColors.border,
         centerTitle: true,
-        iconTheme: IconThemeData(color: LightColors.white),
+        iconTheme: IconThemeData(color: LightColors.textPrimary),
         titleTextStyle: TextStyle(
-          color: LightColors.white,
+          color: LightColors.textPrimary,
           fontSize: 18,
           fontWeight: FontWeight.w600,
         ),
       ),
       cardTheme: const CardThemeData(
         color: LightColors.card,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(16)),
+          side: BorderSide(color: LightColors.border),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: LightColors.flutterSky,
+          backgroundColor: LightColors.saffron,
           foregroundColor: LightColors.white,
+          disabledBackgroundColor: LightColors.border,
+          disabledForegroundColor: LightColors.textMuted,
           minimumSize: const Size(double.infinity, 52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 0,
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
+      // Solid buttons only: secondary actions get a solid soft-saffron fill, no outline
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: LightColors.flutterSky,
-          side: const BorderSide(color: LightColors.flutterSky),
+          foregroundColor: LightColors.saffronDeep,
+          backgroundColor: LightColors.saffronSoft,
+          side: BorderSide.none,
+          elevation: 0,
           minimumSize: const Size(double.infinity, 52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -240,7 +253,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: LightColors.surface,
+        fillColor: LightColors.surfaceLight,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: LightColors.border),
@@ -251,7 +264,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: LightColors.flutterSky, width: 1.5),
+          borderSide: const BorderSide(color: LightColors.saffron, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -262,9 +275,40 @@ class AppTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
       dividerTheme: const DividerThemeData(color: LightColors.divider),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: LightColors.saffronDeep, textStyle: const TextStyle(fontWeight: FontWeight.w600)),
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: LightColors.saffron, foregroundColor: LightColors.white,
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.all(LightColors.white),
+        trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? LightColors.saffron : LightColors.textMuted.withValues(alpha: 0.35)),
+        trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+      ),
+      chipTheme: const ChipThemeData(
+        backgroundColor: LightColors.surfaceLight,
+        selectedColor: Color(0x33D9661C),
+        side: BorderSide(color: LightColors.border),
+        labelStyle: TextStyle(color: LightColors.textSecondary),
+      ),
+      tabBarTheme: const TabBarThemeData(
+        labelColor: LightColors.saffronDeep,
+        unselectedLabelColor: LightColors.textMuted,
+        indicatorColor: LightColors.saffron,
+        dividerColor: LightColors.divider,
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(color: LightColors.saffron),
+      snackBarTheme: const SnackBarThemeData(
+        backgroundColor: LightColors.textPrimary,
+        contentTextStyle: TextStyle(color: LightColors.white),
+        behavior: SnackBarBehavior.floating,
+      ),
+      dialogTheme: const DialogThemeData(backgroundColor: LightColors.surface, surfaceTintColor: Colors.transparent),
+      bottomSheetTheme: const BottomSheetThemeData(backgroundColor: LightColors.surface, surfaceTintColor: Colors.transparent),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: LightColors.card,
-        selectedItemColor: LightColors.flutterSky,
+        backgroundColor: LightColors.surface,
+        selectedItemColor: LightColors.saffron,
         unselectedItemColor: LightColors.textMuted,
         type: BottomNavigationBarType.fixed,
         elevation: 0,

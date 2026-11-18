@@ -112,10 +112,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
     [Color(0xFF0D1A2D), Color(0xFF0D0D0D)],
     [Color(0xFF1A0D2D), Color(0xFF0D0D0D)],
   ];
+  // Light mode: the website's solid warm background on every page
   static const _lightGradients = [
-    [Color(0xFFE8F4FF), Color(0xFFFFFFFF)],
-    [Color(0xFFE0EEFF), Color(0xFFFFFFFF)],
-    [Color(0xFFEEE8FF), Color(0xFFFFFFFF)],
+    [Color(0xFFFFFDF7), Color(0xFFFFFDF7)],
+    [Color(0xFFFFFDF7), Color(0xFFFFFDF7)],
+    [Color(0xFFFFFDF7), Color(0xFFFFFDF7)],
   ];
 
   Color _accentForPage(int index, BuildContext context) =>
@@ -212,7 +213,7 @@ class _BackgroundSymbols extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final symbolColor = isDark ? accentColor : Color.lerp(accentColor, const Color(0xFF042B59), 0.4)!;
+    final symbolColor = isDark ? accentColor : Color.lerp(accentColor, const Color(0xFF6B2A0E), 0.3)!;
     final i = page.floor().clamp(0, _pages.length - 1);
     final j = (i + 1).clamp(0, _pages.length - 1);
     return AnimatedBuilder(

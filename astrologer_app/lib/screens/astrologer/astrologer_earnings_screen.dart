@@ -157,10 +157,7 @@ class _AstrologerEarningsView extends StatelessWidget {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [context.clr.accent, context.clr.accent.withValues(alpha: 0.7)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
-        ),
+        color: context.clr.accent, // solid brand colour
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(

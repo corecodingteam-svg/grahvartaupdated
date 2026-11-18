@@ -93,13 +93,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       ) : null,
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: Theme.of(context).brightness == Brightness.dark
-                ? [const Color(0xFF0D1A3A), const Color(0xFF0D0D0D)]
-                : [const Color(0xFFE6F0FF), const Color(0xFFFFFFFF)],
-          ),
+          color: Theme.of(context).brightness == Brightness.dark ? null : context.clr.bg,
+          gradient: Theme.of(context).brightness == Brightness.dark
+              ? const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF0D1A3A), Color(0xFF0D0D0D)],
+                )
+              : null,
         ),
         child: SafeArea(
           child: SingleChildScrollView(
@@ -112,11 +113,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   Container(
                     width: 56, height: 56,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF027DFD).withValues(alpha: 0.15),
+                      color: context.clr.accent.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF027DFD).withValues(alpha: 0.3)),
+                      border: Border.all(color: context.clr.accent.withValues(alpha: 0.3)),
                     ),
-                    child: const Icon(Icons.lock_reset_rounded, color: Color(0xFF027DFD), size: 28),
+                    child: Icon(Icons.lock_reset_rounded, color: context.clr.accent, size: 28),
                   ),
                   const SizedBox(height: 24),
                 ],
@@ -130,12 +131,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF027DFD).withValues(alpha: 0.08),
+                      color: context.clr.accent.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF027DFD).withValues(alpha: 0.2)),
+                      border: Border.all(color: context.clr.accent.withValues(alpha: 0.2)),
                     ),
                     child: Row(children: [
-                      const Icon(Icons.info_outline, color: Color(0xFF027DFD), size: 16),
+                      Icon(Icons.info_outline, color: context.clr.accent, size: 16),
                       const SizedBox(width: 8),
                       Expanded(child: Text(
                         _knowsTemporary
@@ -206,7 +207,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   child: ElevatedButton(
                     onPressed: _loading ? null : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF027DFD),
+                      backgroundColor: context.clr.accent,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
