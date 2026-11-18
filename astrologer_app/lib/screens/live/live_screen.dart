@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/services.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:shimmer/shimmer.dart';
@@ -942,6 +943,8 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
     if (_remoteJoined && _engine != null) {
       return AgoraVideoView(
         controller: VideoViewController.remote(
+          // iOS: render into Flutter so the call controls stay on top of the video
+          useFlutterTexture: defaultTargetPlatform == TargetPlatform.iOS,
           rtcEngine: _engine!,
           canvas: VideoCanvas(uid: _remoteUid),
           connection: RtcConnection(channelId: widget.session.id),

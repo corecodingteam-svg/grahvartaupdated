@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../models/astrologer.dart';
@@ -176,6 +177,8 @@ class _AstrologerBroadcastScreenState extends State<AstrologerBroadcastScreen> {
           if (_joined && _engine != null && !_cameraOff)
             AgoraVideoView(
               controller: VideoViewController(
+                // iOS: render into Flutter so the call controls stay on top of the video
+                useFlutterTexture: defaultTargetPlatform == TargetPlatform.iOS,
                 rtcEngine: _engine!,
                 canvas: const VideoCanvas(uid: 0),
               ),

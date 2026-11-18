@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../services/api_service.dart';
@@ -167,6 +168,8 @@ class _AstrologerCallScreenState extends State<AstrologerCallScreen> {
                 Positioned.fill(
                   child: AgoraVideoView(
                     controller: VideoViewController.remote(
+                      // iOS: render into Flutter so the call controls stay on top of the video
+                      useFlutterTexture: defaultTargetPlatform == TargetPlatform.iOS,
                       rtcEngine: _engine!,
                       canvas: VideoCanvas(uid: _remoteUid),
                       connection: RtcConnection(channelId: widget.consultationId),
@@ -188,6 +191,8 @@ class _AstrologerCallScreenState extends State<AstrologerCallScreen> {
                       borderRadius: BorderRadius.circular(10),
                       child: AgoraVideoView(
                         controller: VideoViewController(
+                          // iOS: render into Flutter so the call controls stay on top of the video
+                          useFlutterTexture: defaultTargetPlatform == TargetPlatform.iOS,
                           rtcEngine: _engine!,
                           canvas: const VideoCanvas(uid: 0),
                         ),
