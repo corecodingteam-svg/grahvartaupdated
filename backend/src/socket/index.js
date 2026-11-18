@@ -150,6 +150,7 @@ function initSocket(io) {
 
     // ─── CONSULTATION REQUEST ────────────────────────────────────
     socket.on('request_consultation', async ({ astrologer_id, type }) => {
+      socket.cancelledRequest = null;
       try {
         console.log(`[request_consultation] user=${userId} astrologer_id=${astrologer_id} type=${type}`);
 
@@ -267,6 +268,13 @@ function initSocket(io) {
         socket.consultationId = consultationId;
         socket.join(`consultation:${consultationId}`);
 
+        // User already backed out while this request was being created
+        const cr = socket.cancelledRequest;
+        if (cr && (!cr.astrologerId || cr.astrologerId === astrologer_id) && Date.now() - cr.at < 60000) {
+          await cancelQueued(consultationId, 'cancelled', 'user');
+          return;
+        }
+
         socket.emit('consultation_queued', {
           consultation_id: consultationId,
           position: queuePos.rows[0].position,
@@ -276,6 +284,9 @@ function initSocket(io) {
 
         // Notify astrologer via socket (if online) — retry once after 2s in case set_role is still resolving
         const notifyAstrologer = async (attempt = 1) => {
+          // Don't ring for a request that was cancelled in the meantime
+          const st = await db.query('SELECT status FROM consultations WHERE id = $1', [consultationId]).catch(() => ({ rows: [] }));
+          if (st.rows[0]?.status !== 'queued') return true;
           const astroConnected = isAstrologerConnected(astrologer_id);
           console.log(`[notify attempt ${attempt}] astrologer_id=${astrologer_id} connected=${astroConnected}`);
           if (astroConnected) {
@@ -323,6 +334,35 @@ function initSocket(io) {
     // checked with it, so nobody can join, read, accept, end or post into a
     // session that isn't theirs.
     const partyCache = new Map();
+    /** Cancels a request that is still waiting for the astrologer and closes their popup. */
+    const cancelQueued = async (consultationId, reason, by) => {
+      const r = await db.query(
+        `UPDATE consultations SET status = 'cancelled', ended_at = NOW() WHERE id = $1 AND status = 'queued' RETURNING astrologer_id`,
+        [consultationId]
+      ).catch(() => ({ rows: [] }));
+      if (!r.rows.length) return false;
+      await recordEnd(consultationId, reason, by);
+      await db.query(`UPDATE consultation_queue SET status='cancelled' WHERE consultation_id=$1`, [consultationId]).catch(() => {});
+      await db.query('UPDATE astrologers SET queue_count = GREATEST(queue_count - 1, 0) WHERE id = $1', [r.rows[0].astrologer_id]).catch(() => {});
+      io.emitToParties(consultationId, 'consultation_ended', { consultation_id: consultationId, reason });
+      return true;
+    };
+
+    // The user left the call/chat screen before (or while) the request was
+    // created — cancel whatever is still waiting so the astrologer stops ringing.
+    socket.on('cancel_request', async ({ astrologer_id } = {}) => {
+      try {
+        socket.cancelledRequest = { astrologerId: astrologer_id || null, at: Date.now() };
+        const q = await db.query(
+          `SELECT id FROM consultations WHERE user_id = $1 AND status = 'queued' ${astrologer_id ? 'AND astrologer_id = $2' : ''}`,
+          astrologer_id ? [userId, astrologer_id] : [userId]
+        );
+        for (const row of q.rows) await cancelQueued(row.id, 'cancelled', 'user');
+      } catch (err) {
+        console.error('[cancel_request]', err.message);
+      }
+    });
+
     const partyOf = async (consultationId) => {
       if (!consultationId || typeof consultationId !== 'string') return null;
       if (partyCache.has(consultationId)) return partyCache.get(consultationId);
@@ -789,11 +829,14 @@ function initSocket(io) {
             total_amount: engine.totalCharged,
           });
         } else {
-          // Consultation may still be queued/active without a billing engine (e.g. chat not yet started)
-          await db.query(
-            `UPDATE consultations SET status = 'missed', ended_at = NOW() WHERE id = $1 AND status IN ('queued', 'active')`,
-            [socket.consultationId]
-          ).catch(() => {});
+          // Still waiting for the astrologer: cancel it (frees the queue and closes their popup)
+          if (!(await cancelQueued(socket.consultationId, 'user_disconnected', 'system'))) {
+            // Active but not billing yet (e.g. a chat that had not started)
+            await db.query(
+              `UPDATE consultations SET status = 'completed', ended_at = NOW() WHERE id = $1 AND status = 'active'`,
+              [socket.consultationId]
+            ).catch(() => {});
+          }
           io.emitToParties(socket.consultationId, 'consultation_ended', {
             consultation_id: socket.consultationId,
             reason: 'user_disconnected',

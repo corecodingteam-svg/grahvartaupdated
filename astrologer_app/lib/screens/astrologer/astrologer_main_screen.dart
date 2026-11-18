@@ -15,6 +15,7 @@ import 'astrologer_consultations_screen.dart';
 import 'astrologer_chat_screen.dart';
 import '../../widgets/chat_pin_sheet.dart';
 import '../../services/sound_service.dart';
+import '../../utils/call_permissions.dart';
 import 'astrologer_call_screen.dart';
 
 class AstrologerMainScreen extends StatefulWidget {
@@ -25,6 +26,10 @@ class AstrologerMainScreen extends StatefulWidget {
 }
 
 class _AstrologerMainScreenState extends State<AstrologerMainScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  // App-wide listeners for incoming requests; persistent so a chat or call
+  // screen closing (which removes its own listeners) never drops them.
+  late Function(dynamic) _hRequest, _hStarted, _hEnded, _hRejected;
+
   late final AnimationController _overlayCtrl;
   late final Animation<double> _overlayScale;
   late final Animation<double> _overlayFade;
@@ -77,10 +82,10 @@ class _AstrologerMainScreenState extends State<AstrologerMainScreen> with Single
     WidgetsBinding.instance.removeObserver(this);
     _heartbeatTimer?.cancel();
     _overlayCtrl.dispose();
-    SocketService.instance.off('new_consultation_request');
-    SocketService.instance.off('consultation_started');
-    SocketService.instance.off('consultation_ended');
-    SocketService.instance.off('consultation_rejected');
+    SocketService.instance.offHandler('new_consultation_request', _hRequest);
+    SocketService.instance.offHandler('consultation_started', _hStarted);
+    SocketService.instance.offHandler('consultation_ended', _hEnded);
+    SocketService.instance.offHandler('consultation_rejected', _hRejected);
     SoundService.instance.stopRinging();
     _cubit.close();
     super.dispose();
@@ -89,28 +94,32 @@ class _AstrologerMainScreenState extends State<AstrologerMainScreen> with Single
   void _setupSocket() {
     final socket = SocketService.instance;
     socket.connect(role: 'astrologer');
-    socket.on('new_consultation_request', (data) {
+    socket.on('new_consultation_request', _hRequest = (data) {
       if (!mounted) return;
       _cubit.setIncomingRequest(Map<String, dynamic>.from(data as Map));
       _overlayCtrl.forward(from: 0);
       _playRingtone(data['type']?.toString() ?? 'chat');
     });
 
-    socket.on('consultation_started', (data) {
+    socket.on('consultation_started', _hStarted = (data) {
       if (!mounted) return;
       _consultationsKey.refresh();
     });
-    socket.on('consultation_ended', (data) {
+    socket.on('consultation_ended', _hEnded = (data) {
       if (!mounted) return;
       // The request that is ringing right now was cancelled by the user
       if (_dismissIfRinging(data, 'cancelled the request')) return;
       _cubit.setIndex(1);
       _consultationsKey.refresh();
     });
-    socket.on('consultation_rejected', (data) {
+    socket.on('consultation_rejected', _hRejected = (data) {
       if (!mounted) return;
       _dismissIfRinging(data, 'is no longer waiting');
     });
+
+    for (final e in {'new_consultation_request': _hRequest, 'consultation_started': _hStarted, 'consultation_ended': _hEnded, 'consultation_rejected': _hRejected}.entries) {
+      socket.markPersistent(e.key, e.value);
+    }
 
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       final socket = SocketService.instance;
@@ -147,6 +156,13 @@ class _AstrologerMainScreenState extends State<AstrologerMainScreen> with Single
     // Chats are end-to-end encrypted: unlock the chat key before accepting,
     // so the user isn't billed while the astrologer enters their PIN.
     if (type == 'chat' && !await ensureChatUnlocked(context)) return;
+    if (!mounted) return;
+    // Calls need the microphone (and camera for video) before accepting,
+    // otherwise the user is billed for a call that can't be heard or seen.
+    if (type != 'chat' && !await ensureCallPermissions(context, video: type == 'video')) {
+      if (mounted && _cubit.state.incomingRequest != null) _playRingtone(type.toString());
+      return;
+    }
     if (!mounted) return;
     SocketService.instance.acceptConsultation(req['consultation_id']);
     _cubit.clearIncomingRequest();

@@ -28,9 +28,10 @@ class SocketService {
 
   String _role = 'user';
 
-  // Listeners registered before the socket object is created are buffered here
-  // and flushed once _socket is initialized.
-  final Map<String, List<Function(dynamic)>> _pendingListeners = {};
+  // Every registered listener, kept for the lifetime of the app so it survives
+  // reset() (a new socket object) and is attached to whichever socket is current.
+  final Map<String, List<Function(dynamic)>> _handlers = {};
+  final Map<String, Set<Function(dynamic)>> _persistent = {};
 
   Future<void> connect({VoidCallback? onConnected, VoidCallback? onReconnect, String role = 'user'}) async {
     _role = role;
@@ -67,13 +68,12 @@ class SocketService {
           .build(),
     );
 
-    // Flush any listeners that were registered before the socket was created
-    _pendingListeners.forEach((event, handlers) {
+    // Attach every listener registered so far (including ones from before a reset)
+    _handlers.forEach((event, handlers) {
       for (final h in handlers) {
         _socket!.on(event, h);
       }
     });
-    _pendingListeners.clear();
 
     _socket!.onConnect((_) {
       debugPrint('Socket connected as $_role');
@@ -106,36 +106,48 @@ class SocketService {
     _socket?.dispose();
     _socket = null;
     connection.value = false;
-    _pendingListeners.clear();
   }
 
   void emit(String event, dynamic data) => _socket?.emit(event, data);
 
-  /// Register an event listener. Safe to call before [connect] — the handler
-  /// is buffered and applied as soon as the socket object is created.
-  void on(String event, Function(dynamic) handler) {
-    if (_socket != null) {
-      _socket!.on(event, handler);
-    } else {
-      _pendingListeners.putIfAbsent(event, () => []).add(handler);
+  /// Register an event listener. Safe to call before [connect]; listeners are
+  /// kept across reconnects and resets. [persistent] listeners (app-wide ones
+  /// such as the incoming-request popup or live presence) are not removed by
+  /// a screen calling [off] for the same event — only by [offHandler].
+  void on(String event, Function(dynamic) handler, {bool persistent = false}) {
+    _handlers.putIfAbsent(event, () => []).add(handler);
+    if (persistent) _persistent.putIfAbsent(event, () => {}).add(handler);
+    _socket?.on(event, handler);
+  }
+
+  /// Marks an already registered listener as persistent (see [on]).
+  void markPersistent(String event, Function(dynamic) handler) =>
+      _persistent.putIfAbsent(event, () => {}).add(handler);
+
+  /// Removes this event's screen-level listeners; persistent ones stay.
+  void off(String event) {
+    _socket?.off(event);
+    final keep = _persistent[event] ?? const {};
+    _handlers[event]?.removeWhere((h) => !keep.contains(h));
+    for (final h in keep) {
+      _socket?.on(event, h);
     }
   }
 
-  void off(String event) {
-    _socket?.off(event);
-    _pendingListeners.remove(event);
-  }
-
-  /// Remove one specific handler (other screens' handlers for the same event stay).
+  /// Remove one specific handler (other listeners for the same event stay).
   void offHandler(String event, Function(dynamic) handler) {
     _socket?.off(event, handler);
-    _pendingListeners[event]?.remove(handler);
+    _handlers[event]?.remove(handler);
+    _persistent[event]?.remove(handler);
   }
 
   // ── Consultation ──────────────────────────────────────────────
   void requestConsultation(String astrologerId, String type) {
     emit('request_consultation', {'astrologer_id': astrologerId, 'type': type});
   }
+
+  /// Cancel a request whose id isn't known yet (user left before it was confirmed).
+  void cancelRequest(String astrologerId) => emit('cancel_request', {'astrologer_id': astrologerId});
 
   void endConsultation(String consultationId) {
     emit('end_consultation', {'consultation_id': consultationId});

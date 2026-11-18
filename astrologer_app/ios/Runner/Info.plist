@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Grahvarta Astro uses your camera for video consultations and to take photos you share in chat.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Grahvarta Astro uses your microphone for voice and video consultations.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Grahvarta Astro lets you choose photos to share in chats and for your profile.</string>
 </dict>
 </plist>

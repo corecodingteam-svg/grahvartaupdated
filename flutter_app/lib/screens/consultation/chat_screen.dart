@@ -262,7 +262,10 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  bool _requested = false;
+
   void _requestConsultation() {
+    _requested = true;
     _socket.requestConsultation(widget.astrologer.id, 'chat');
     _bloc.add(ChatSystemMessage('Connecting to ${widget.astrologer.displayName}…'));
   }
@@ -501,6 +504,9 @@ class _ChatScreenState extends State<ChatScreen> {
     final state = _bloc.state;
     if (state.consultationId != null && !state.isEnded) {
       _socket.endConsultation(state.consultationId!);
+    } else if (state.consultationId == null && _requested) {
+      // Left before the request was confirmed — make sure the astrologer stops ringing
+      _socket.cancelRequest(widget.astrologer.id);
     }
     _socket.off('consultation_queued');
     _socket.off('consultation_started');

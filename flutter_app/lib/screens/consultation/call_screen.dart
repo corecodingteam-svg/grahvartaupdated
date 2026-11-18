@@ -5,6 +5,7 @@ import '../../models/astrologer.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/call_permissions.dart';
 import 'chat_history_screen.dart';
 
 // Fallback only — the backend's /agora/token response carries the App ID it signed for
@@ -43,6 +44,19 @@ class _CallScreenState extends State<CallScreen> {
   void initState() {
     super.initState();
     _consultationId = widget.consultationId;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
+  }
+
+  /// Microphone (and camera) must be allowed before the call is requested —
+  /// otherwise the user would be billed for a call nobody can hear or see.
+  Future<void> _start() async {
+    if (!await ensureCallPermissions(context, video: _isVideo)) {
+      if (!mounted) return;
+      _isEnded = true; // nothing was requested
+      Navigator.of(context).pop();
+      return;
+    }
+    if (!mounted) return;
     _initSocket();
     // If consultationId already known (e.g. rejoining), start Agora immediately
     if (_consultationId != null) _initAgora(_consultationId!);
@@ -199,10 +213,20 @@ class _CallScreenState extends State<CallScreen> {
     setState(() => _isSpeakerOn = !_isSpeakerOn);
   }
 
+  /// Ends the call, or cancels the request if it hasn't been confirmed yet,
+  /// so the astrologer's incoming-call popup closes.
+  void _endOrCancel() {
+    if (_consultationId != null) {
+      _socket.endConsultation(_consultationId!);
+    } else {
+      _socket.cancelRequest(widget.astrologer.id);
+    }
+  }
+
   Future<void> _endCall() async {
     if (_isEnded) return;
     setState(() => _isEnded = true);
-    if (_consultationId != null) _socket.endConsultation(_consultationId!);
+    _endOrCancel();
     await _cleanup();
     await _showEndDialog({});
   }
@@ -255,6 +279,8 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   void dispose() {
+    // Left with the back button / gesture: stop the request or call too
+    if (!_isEnded) _endOrCancel();
     _cleanup();
     _socket.off('consultation_queued');
     _socket.off('consultation_started');
