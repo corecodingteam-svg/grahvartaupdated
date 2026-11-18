@@ -1,7 +1,7 @@
 name: grahvarta
 description: Grahvarta - Full Astrology Platform
 publish_to: none
-version: 3.0.0+4
+version: 3.1.1+6
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -69,6 +69,8 @@ dependencies:
 
   cupertino_icons: ^1.0.2
   share_plus: ^13.3.1
+  pinenacl: ^0.6.0
+  cryptography: ^2.7.0
 
 
 dev_dependencies:

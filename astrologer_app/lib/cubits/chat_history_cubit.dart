@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../services/api_service.dart';
+import '../services/chat_crypto.dart';
 
 // --------------- State ---------------
 
@@ -34,6 +35,8 @@ class ChatHistoryCubit extends Cubit<ChatHistoryState> {
   Future<void> load() async {
     emit(state.copyWith(loading: true, error: null));
     try {
+      // Load this device's chat key (no PIN prompt) so message previews can be decrypted
+      await ChatCrypto.instance.status().catchError((_) => ChatKeyStatus.locked);
       final data = await ApiService.getAstrologerChatThreads();
       emit(state.copyWith(loading: false, threads: data));
     } catch (e) {

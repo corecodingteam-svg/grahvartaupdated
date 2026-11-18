@@ -26,7 +26,8 @@ class ChatMessageSent extends ChatEvent {
 class ChatImageUploaded extends ChatEvent {
   final String localId;
   final String url;
-  ChatImageUploaded(this.localId, this.url);
+  final String type;
+  ChatImageUploaded(this.localId, this.url, {this.type = 'image'});
 }
 
 class ChatImageUploadFailed extends ChatEvent {

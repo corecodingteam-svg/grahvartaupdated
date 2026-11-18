@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, Navigate } from 'react-router-dom'
-import { ArrowLeft, Send, PhoneOff, Wallet } from 'lucide-react'
+import { ArrowLeft, Send, PhoneOff, Wallet, Lock, ImagePlus } from 'lucide-react'
 import { T } from '@i18n'
 import { fetchAstrologerById } from '../lib/astrologers'
 import { normalizeAstrologer } from '../lib/astrologerDisplay'
@@ -8,6 +8,8 @@ import { useConsultation } from '../hooks/useConsultation'
 import { useAuth } from '../context/AuthContext'
 import Avatar from '../components/ui/Avatar'
 import { setPageMeta } from '../lib/demo'
+import { useChatUnlock } from '../lib/useChatUnlock'
+import EncryptedImage from '../lib/EncryptedImage'
 
 function formatTime(totalSeconds) {
   const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0')
@@ -34,10 +36,27 @@ export default function Chat() {
   const [text, setText] = useState('')
   const messagesEndRef = useRef(null)
   const typingTimeoutRef = useRef(null)
+  const fileRef = useRef(null)
+  const [sendingImage, setSendingImage] = useState(false)
+
+  // Chats are end-to-end encrypted: unlock this browser's chat key (asking for
+  // the chat PIN if needed) before the consultation is requested.
+  const { ensure, modal } = useChatUnlock()
+  const [unlocked, setUnlocked] = useState(false)
+  useEffect(() => {
+    let live = true
+    ensure().then((ok) => {
+      if (!live) return
+      if (ok) setUnlocked(true)
+      else navigate(-1)
+    })
+    return () => { live = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const {
-    status, errorMessage, messages, peerTyping, elapsedSeconds, sendMessage, setTyping, endConsultation,
-  } = useConsultation({ astrologerId: id, type: 'chat' })
+    status, errorMessage, messages, peerTyping, elapsedSeconds, sendMessage, sendImage, notice, endToEnd, setTyping, endConsultation,
+  } = useConsultation({ astrologerId: id, type: 'chat', enabled: unlocked })
 
   useEffect(() => {
     let cancelled = false
@@ -77,9 +96,22 @@ export default function Chat() {
   function handleSend(e) {
     e.preventDefault()
     if (!text.trim()) return
-    sendMessage(text)
-    setText('')
+    if (sendMessage(text)) setText('') // keep the text if it was blocked, so it can be edited
     setTyping(false)
+  }
+
+  async function handleImage(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !file.type.startsWith('image/')) return
+    setSendingImage(true)
+    try {
+      await sendImage(file)
+    } catch {
+      // upload failed; nothing was sent
+    } finally {
+      setSendingImage(false)
+    }
   }
 
   function handleEnd() {
@@ -90,6 +122,7 @@ export default function Chat() {
 
   return (
     <div className="container-page py-6 sm:py-8">
+      {modal}
       <button
         type="button"
         onClick={() => navigate(-1)}
@@ -162,6 +195,12 @@ export default function Chat() {
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2.5">
+            <p className="self-center max-w-xs flex items-start gap-2 text-[11px] leading-snug text-text-secondary bg-surface-light border border-border rounded-xl px-3 py-2 text-center">
+              <Lock size={12} className="mt-0.5 shrink-0 text-orange" />
+              {endToEnd
+                ? 'Messages are end-to-end encrypted. No one outside this chat, not even Grahvarta, can read them.'
+                : 'Your chats are secure and encrypted in transit. Your conversation stays private.'}
+            </p>
             {messages.length === 0 && (
               <p className="text-xs text-text-muted text-center mt-4">
                 You&apos;re connected — say hello to get started.
@@ -178,7 +217,11 @@ export default function Chat() {
                       : 'self-start bg-surface-light text-text-primary rounded-tl-sm'
                   }`}
                 >
-                  {msg.content}
+                  {msg.type === 'e2e_image'
+                    ? <EncryptedImage payload={msg.payload} />
+                    : msg.type === 'image'
+                      ? <img src={msg.content} alt="Shared in chat" className="max-w-[240px] max-h-[240px] rounded-xl object-cover" />
+                      : msg.content}
                 </div>
               )
             })}
@@ -190,8 +233,25 @@ export default function Chat() {
         )}
 
         {/* Input */}
+        {status === 'active' && notice && (
+          <p className="px-4 py-2 text-xs text-error bg-error/10 border-t border-error/20">{notice}</p>
+        )}
         {status === 'active' && (
           <form onSubmit={handleSend} className="flex items-center gap-2 px-3 py-3 border-t border-border shrink-0">
+            {endToEnd && (
+              <>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImage} />
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={sendingImage}
+                  className="w-10 h-10 rounded-xl bg-surface-light text-text-secondary flex items-center justify-center disabled:opacity-40 shrink-0"
+                  aria-label="Send a photo"
+                >
+                  <ImagePlus size={16} />
+                </button>
+              </>
+            )}
             <input
               type="text"
               value={text}

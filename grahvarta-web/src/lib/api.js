@@ -7,6 +7,8 @@
 // URL) once available. Until then these calls simply fail with a network
 // error, which every call site already handles via loading/error state.
 
+import { configureChatCrypto, clearChatKey } from './chatCrypto'
+
 export const API_URL = import.meta.env.VITE_API_URL || ''
 export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || API_URL
 
@@ -29,12 +31,15 @@ export function setToken(token) {
 }
 
 export function clearToken() {
+  clearChatKey()
   try {
     localStorage.removeItem(TOKEN_KEY)
   } catch {
     // Ignore — storage may be unavailable (private browsing, quota, etc).
   }
 }
+
+configureChatCrypto({ apiBase: `${API_URL}/api`, getToken })
 
 export class ApiError extends Error {
   constructor(message, status) {

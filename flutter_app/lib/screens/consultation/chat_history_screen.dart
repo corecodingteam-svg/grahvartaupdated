@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../services/chat_crypto.dart';
 import 'thread_screen.dart';
 
 class ChatHistoryScreen extends StatefulWidget {
@@ -24,6 +25,8 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
   Future<void> _load() async {
     setState(() { _isLoading = true; _error = null; });
     try {
+      // Load this device's chat key (no PIN prompt here) so previews can be decrypted
+      await ChatCrypto.instance.status().catchError((_) => ChatKeyStatus.locked);
       final data = await ApiService.getChatThreads();
       if (mounted) setState(() { _threads = data; _isLoading = false; });
     } catch (e) {
@@ -180,7 +183,7 @@ class _ThreadTile extends StatelessWidget {
               const SizedBox(height: 3),
               Row(children: [
                 Expanded(child: Text(
-                  thread['last_message'] ?? 'Start a conversation',
+                  thread['last_message'] == null ? 'Start a conversation' : ChatCrypto.instance.previewOf(thread['last_message'] as String?),
                   style: TextStyle(
                     color: unread > 0 ? context.clr.txtSecondary : context.clr.txtMuted,
                     fontSize: 12,

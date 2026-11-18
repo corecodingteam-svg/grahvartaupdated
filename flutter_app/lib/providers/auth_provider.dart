@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../services/chat_crypto.dart';
 
 class AstrologerProfile {
   final String id;
@@ -119,6 +120,7 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } catch (_) {
       await ApiService.clearToken();
+      await ChatCrypto.instance.clear();
       return false;
     }
   }
@@ -177,6 +179,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     await ApiService.clearToken();
+      await ChatCrypto.instance.clear();
     _user = null;
     notifyListeners();
   }

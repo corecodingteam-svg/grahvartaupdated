@@ -1,7 +1,7 @@
 name: grahvarta_astrology
 description: Grahvarta Astrology - Astrologer App
 publish_to: none
-version: 3.0.0+4
+version: 3.1.1+6
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -67,6 +67,8 @@ dependencies:
   pull_to_refresh: ^2.0.0
 
   cupertino_icons: ^1.0.2
+  pinenacl: ^0.6.0
+  cryptography: ^2.7.0
 
 
 dev_dependencies:
@@ -74,6 +76,8 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.3
+  integration_test:
+    sdk: flutter
 
 flutter_launcher_icons:
   android: true

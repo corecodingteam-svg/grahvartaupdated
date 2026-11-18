@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../services/chat_crypto.dart';
+import '../../widgets/chat_pin_sheet.dart';
+import '../../widgets/encrypted_image.dart';
 import '../../widgets/secure_chat_notice.dart';
 import '../../utils/block_user.dart';
 import 'consultation_transcript_screen.dart';
@@ -68,7 +71,12 @@ class _AstrologerUserThreadScreenState extends State<AstrologerUserThreadScreen>
     }
     try {
       final data = await ApiService.getAstrologerUserMessages(widget.userId);
-      final msgs = List<dynamic>.from(data['messages'] ?? []);
+      var msgs = List<dynamic>.from(data['messages'] ?? []);
+      // Encrypted chats need this device's chat key; ask for the PIN if it isn't unlocked yet
+      if (msgs.any((m) => m['message_type'] == 'e2e') && !ChatCrypto.instance.isReady && mounted) {
+        await ensureChatUnlocked(context);
+      }
+      msgs = ChatCrypto.instance.decryptRows(msgs);
       if (mounted) {
         setState(() {
           _messages = msgs;
@@ -88,7 +96,7 @@ class _AstrologerUserThreadScreenState extends State<AstrologerUserThreadScreen>
     setState(() => _loadingMore = true);
     try {
       final data = await ApiService.getAstrologerUserMessages(widget.userId, before: _oldestTimestamp);
-      final older = List<dynamic>.from(data['messages'] ?? []);
+      final older = ChatCrypto.instance.decryptRows(List<dynamic>.from(data['messages'] ?? []));
       if (mounted) {
         setState(() {
           _messages = [...older, ..._messages];
@@ -309,7 +317,9 @@ class _AstrologerUserThreadScreenState extends State<AstrologerUserThreadScreen>
     );
 
     Widget bubbleChild;
-    if (isImage) {
+    if (type == 'e2e_image') {
+      bubbleChild = EncryptedImage(payloadJson: content as String, borderRadius: bubbleBorderRadius);
+    } else if (isImage) {
       bubbleChild = GestureDetector(
         onTap: () => Navigator.push(context, MaterialPageRoute(
           builder: (_) => _FullscreenImage(url: content),

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import { SOCKET_URL, getToken } from '../lib/api'
+import { decodeMessage, fetchPeerKey, isChatReady, seal, chatKeyStatus, uploadEncryptedImage } from '../lib/chatCrypto'
+import { detectContactInfo, blockedMessageText } from '../lib/contactFilter'
 
 // Drives the socket.io consultation lifecycle exactly as the Flutter app
 // does (backend/src/socket/index.js) — request_consultation creates the
@@ -12,7 +14,7 @@ import { SOCKET_URL, getToken } from '../lib/api'
 // Status machine: connecting -> queued -> active -> ended
 //                            \-> rejected / insufficient_balance / error
 
-export function useConsultation({ astrologerId, type }) {
+export function useConsultation({ astrologerId, type, enabled = true }) {
   const socketRef = useRef(null)
   const consultationIdRef = useRef(null)
   const statusRef = useRef('connecting')
@@ -23,6 +25,13 @@ export function useConsultation({ astrologerId, type }) {
   const [messages, setMessages] = useState([])
   const [peerTyping, setPeerTyping] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [notice, setNotice] = useState('') // e.g. "message not sent" for contact details
+  // End-to-end encryption: the astrologer's public key (null = they use an older app)
+  const [peerKey, setPeerKeyState] = useState(null)
+  const peerKeyRef = useRef(null)
+  const lastSentRef = useRef(null)
+  const setPeerKey = (k) => { peerKeyRef.current = k; setPeerKeyState(k) }
+  const refreshPeerKey = async (id) => { if (id) setPeerKey(await fetchPeerKey(id)) }
 
   const setStatus = useCallback((next) => {
     statusRef.current = next
@@ -35,6 +44,7 @@ export function useConsultation({ astrologerId, type }) {
   }, [])
 
   useEffect(() => {
+    if (!enabled) return undefined
     const token = getToken()
     if (!token) {
       setStatus('error')
@@ -52,17 +62,34 @@ export function useConsultation({ astrologerId, type }) {
 
     socket.on('consultation_queued', (data) => {
       setStatus('queued')
-      if (data?.consultation_id) setConsultationId(data.consultation_id)
+      if (data?.consultation_id) {
+        setConsultationId(data.consultation_id)
+        refreshPeerKey(data.consultation_id)
+      }
     })
 
     socket.on('consultation_started', (data) => {
       setStatus('active')
       if (data?.consultation_id) setConsultationId(data.consultation_id)
+      refreshPeerKey(data?.consultation_id || consultationIdRef.current)
     })
 
     socket.on('new_message', (msg) => {
-      setMessages((prev) => [...prev, msg])
+      setMessages((prev) => [...prev, decodeMessage(msg)])
     })
+
+    // A chat key changed (someone reset their chat PIN): reload keys and resend once
+    socket.on('e2e_key_stale', async () => {
+      const last = lastSentRef.current
+      lastSentRef.current = null
+      await chatKeyStatus().catch(() => {})
+      await refreshPeerKey(consultationIdRef.current)
+      if (last && isChatReady() && peerKeyRef.current) {
+        socket.emit('send_message', { consultation_id: consultationIdRef.current, content: seal(last, peerKeyRef.current), message_type: 'e2e' })
+      }
+    })
+
+    socket.on('message_blocked', (data) => setNotice(data?.message || 'Message not sent.'))
 
     socket.on('peer_typing', (data) => {
       setPeerTyping(!!data?.typing)
@@ -101,15 +128,45 @@ export function useConsultation({ astrologerId, type }) {
       socket.disconnect()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [astrologerId, type])
+  }, [astrologerId, type, enabled])
 
+  const emitPayload = (payload, plain, plainType = 'text') => {
+    const id = consultationIdRef.current
+    if (isChatReady() && peerKeyRef.current) {
+      lastSentRef.current = payload
+      socketRef.current.emit('send_message', { consultation_id: id, content: seal(payload, peerKeyRef.current), message_type: 'e2e' })
+    } else if (plain) {
+      socketRef.current.emit('send_message', { consultation_id: id, content: plain, message_type: plainType })
+    } else {
+      return false
+    }
+    return true
+  }
+
+  /** Returns false (and sets `notice`) when the text contains contact details. */
   const sendMessage = useCallback((content) => {
-    if (!socketRef.current || !consultationIdRef.current || !content.trim()) return
-    socketRef.current.emit('send_message', {
-      consultation_id: consultationIdRef.current,
-      content: content.trim(),
-      message_type: 'text',
-    })
+    const text = content.trim()
+    if (!socketRef.current || !consultationIdRef.current || !text) return false
+    // Phone numbers / email addresses may not be shared. The server can't read
+    // encrypted chats, so the check runs here and the attempt is reported.
+    const check = detectContactInfo(text)
+    if (check.blocked) {
+      setNotice(blockedMessageText(check.detected))
+      socketRef.current.emit('report_blocked_message', { consultation_id: consultationIdRef.current, detected: check.detected, content: text })
+      return false
+    }
+    setNotice('')
+    emitPayload({ t: 'text', b: text }, text)
+    return true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /** Sends a photo (end-to-end encrypted chats only). */
+  const sendImage = useCallback(async (file) => {
+    if (!socketRef.current || !consultationIdRef.current || !isChatReady() || !peerKeyRef.current) return false
+    const payload = await uploadEncryptedImage(file)
+    return emitPayload(payload)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const setTyping = useCallback((typing) => {
@@ -133,6 +190,9 @@ export function useConsultation({ astrologerId, type }) {
     peerTyping,
     elapsedSeconds,
     sendMessage,
+    sendImage,
+    notice,
+    endToEnd: !!peerKey,
     setTyping,
     endConsultation,
   }

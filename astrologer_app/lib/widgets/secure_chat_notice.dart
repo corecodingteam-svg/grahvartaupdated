@@ -4,7 +4,9 @@ import '../theme/app_theme.dart';
 /// Small banner shown at the top of a consultation chat, telling both sides
 /// that the conversation is private and sent over an encrypted connection.
 class SecureChatNotice extends StatelessWidget {
-  const SecureChatNotice({super.key});
+  /// True when messages in this chat are end-to-end encrypted.
+  final bool endToEnd;
+  const SecureChatNotice({super.key, this.endToEnd = true});
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +26,9 @@ class SecureChatNotice extends StatelessWidget {
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                'Your chats are secure and encrypted. Your conversation stays private.',
+                endToEnd
+                    ? 'Messages are end-to-end encrypted. No one outside this chat, not even Grahvarta, can read them.'
+                    : 'Your chats are secure and encrypted in transit. Your conversation stays private.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: context.clr.txtSecondary, fontSize: 11.5, height: 1.35),
               ),

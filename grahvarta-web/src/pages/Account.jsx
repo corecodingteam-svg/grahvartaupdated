@@ -1,3 +1,4 @@
+import { chatKeyStatus, previewOf } from '../lib/chatCrypto'
 import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -1115,7 +1116,8 @@ function ChatHistoryTab() {
   const [error, setError] = useState(false)
 
   useEffect(() => {
-    fetchChatThreads().then(setThreads).catch(() => setError(true))
+    // Load this browser's chat key (no PIN prompt) so encrypted previews can be shown
+    chatKeyStatus().catch(() => null).finally(() => fetchChatThreads().then(setThreads).catch(() => setError(true)))
   }, [])
 
   if (error) return <Card className="text-center py-10"><p className="text-sm text-text-secondary">Could not load chat history.</p></Card>
@@ -1133,7 +1135,7 @@ function ChatHistoryTab() {
           <Avatar src={t.astrologer_avatar_url} name={t.astrologer_name} size={44} />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold truncate">{t.astrologer_name || 'Astrologer'}</p>
-            {t.last_message && <p className="text-xs text-text-muted truncate">{t.last_message}</p>}
+            {t.last_message && <p className="text-xs text-text-muted truncate">{previewOf(t.last_message)}</p>}
           </div>
           {t.unread_count > 0 && (
             <span className="w-5 h-5 rounded-full bg-orange text-white text-[10px] font-bold flex items-center justify-center shrink-0">

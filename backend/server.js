@@ -82,6 +82,7 @@ app.use('/api/horoscope', require('./src/routes/horoscope'));
 app.use('/api', require('./src/routes/content'));
 app.use('/api/astrologers', require('./src/routes/astrologers'));
 app.use('/api/threads', require('./src/routes/threads'));
+app.use('/api/chat-keys', require('./src/routes/chatKeys'));
 app.use('/api/wallet', require('./src/routes/wallet'));
 app.use('/api/live', require('./src/routes/live'));
 app.use('/api/agora', require('./src/routes/agora'));

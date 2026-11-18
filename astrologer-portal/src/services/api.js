@@ -1,6 +1,9 @@
 import axios from 'axios'
+import { configureChatCrypto, clearChatKey } from '../lib/chatCrypto'
 
 const BASE_URL = (import.meta.env.VITE_API_URL || 'https://api.grahvarta.com') + '/api'
+
+configureChatCrypto({ apiBase: BASE_URL, getToken: () => localStorage.getItem('token') })
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -19,6 +22,7 @@ api.interceptors.response.use(
     if (err.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
+      clearChatKey()
       window.location.href = '/login'
     }
     return Promise.reject(err)

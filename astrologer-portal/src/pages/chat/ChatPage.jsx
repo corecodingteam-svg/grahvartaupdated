@@ -1,9 +1,13 @@
 import { useEffect, useState, useRef } from 'react'
-import { MessageSquare, Send, Clock, Phone, Video, PhoneOff } from 'lucide-react'
+import { MessageSquare, Send, Clock, Phone, Video, PhoneOff, Lock, ImagePlus } from 'lucide-react'
 import { astrologerAPI } from '../../services/api'
 import { getSocket } from '../../services/socket'
 import { format } from 'date-fns'
 import { useAuth } from '../../context/AuthContext'
+import { useChatUnlock } from '../../lib/useChatUnlock'
+import EncryptedImage from '../../lib/EncryptedImage'
+import { decodeMessage, fetchPeerKey, isChatReady, seal, chatKeyStatus, uploadEncryptedImage } from '../../lib/chatCrypto'
+import { detectContactInfo, blockedMessageText } from '../../lib/contactFilter'
 
 export default function ChatPage() {
   const [consultations, setConsultations] = useState([])
@@ -17,6 +21,18 @@ export default function ChatPage() {
   const timerRef = useRef(null)
   const messagesEndRef = useRef(null)
   const { user, astrologer } = useAuth()
+  // End-to-end encrypted chat
+  const { ensure, modal } = useChatUnlock()
+  const [peerKey, setPeerKey] = useState(null) // user's public key; null = older app, unencrypted
+  const peerKeyRef = useRef(null)
+  const lastSentRef = useRef(null)
+  const [notice, setNotice] = useState('')
+  const [sendingImage, setSendingImage] = useState(false)
+  const fileRef = useRef(null)
+  useEffect(() => { peerKeyRef.current = peerKey }, [peerKey])
+
+  // Unlock (or set up) the chat key once when the page opens, so accepting is instant
+  useEffect(() => { ensure() }, [ensure])
 
   const astrologerName = astrologer?.display_name || user?.name || 'Astrologer'
 
@@ -78,9 +94,11 @@ export default function ChatPage() {
     ]
   }
 
-  function acceptRequest() {
+  async function acceptRequest() {
     const socket = getSocket()
     if (!socket || !incomingRequest) return
+    // Chats are end-to-end encrypted: unlock the key before accepting so the user isn't billed meanwhile
+    if (incomingRequest.type === 'chat' && !(await ensure())) return
     socket.emit('accept_consultation', { consultation_id: incomingRequest.consultation_id })
     const newConsultation = {
       id: incomingRequest.consultation_id,
@@ -95,15 +113,51 @@ export default function ChatPage() {
     setIncomingRequest(null)
   }
 
-  function sendGreeting(text) {
+  // Sends text or a photo payload — sealed end-to-end when the user's app supports it
+  function emitPayload(payload, plain) {
     const socket = getSocket()
-    if (!socket || !selected) return
-    socket.emit('send_message', {
-      consultation_id: selected.id,
-      content: text,
-      message_type: 'text',
-    })
+    if (!socket || !selected) return false
+    if (isChatReady() && peerKeyRef.current) {
+      lastSentRef.current = { id: selected.id, payload }
+      socket.emit('send_message', { consultation_id: selected.id, content: seal(payload, peerKeyRef.current), message_type: 'e2e' })
+      return true
+    }
+    if (!plain) return false
+    socket.emit('send_message', { consultation_id: selected.id, content: plain, message_type: 'text' })
+    return true
+  }
+
+  // Phone numbers / email addresses may not be shared. The server can't read
+  // encrypted chats, so the check runs here and the attempt is reported.
+  function sendText(text) {
+    const check = detectContactInfo(text)
+    if (check.blocked) {
+      setNotice(blockedMessageText(check.detected))
+      getSocket()?.emit('report_blocked_message', { consultation_id: selected.id, detected: check.detected, content: text })
+      return false
+    }
+    setNotice('')
+    return emitPayload({ t: 'text', b: text }, text)
+  }
+
+  function sendGreeting(text) {
+    if (!selected) return
+    sendText(text)
     setShowGreetings(false)
+  }
+
+  async function sendImage(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !file.type.startsWith('image/') || !selected) return
+    setSendingImage(true)
+    try {
+      emitPayload(await uploadEncryptedImage(file))
+    } catch {
+      setNotice('Photo could not be sent. Please try again.')
+    } finally {
+      setSendingImage(false)
+    }
   }
 
   function rejectRequest() {
@@ -121,19 +175,51 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!selected) return
-    astrologerAPI.getConsultationMessages(selected.id)
-      .then(res => setMessages(res.data.data || []))
-      .catch(() => {})
+    let live = true
+    setPeerKey(null)
+    setNotice('')
+    ;(async () => {
+      try {
+        const res = await astrologerAPI.getConsultationMessages(selected.id)
+        const rows = res.data.data || []
+        if (rows.some(m => m.message_type === 'e2e') && !isChatReady()) await ensure()
+        if (live) setMessages(rows.map(decodeMessage))
+      } catch { /* ignore */ }
+      const key = await fetchPeerKey(selected.id)
+      if (live) setPeerKey(key)
+    })()
 
     const socket = getSocket()
     if (socket) {
       socket.emit('join_consultation', { consultation_id: selected.id })
       const handler = (msg) => {
-        if (msg.consultation_id === selected.id) setMessages(p => [...p, msg])
+        if (msg.consultation_id === selected.id) setMessages(p => [...p, decodeMessage(msg)])
       }
+      // A chat key changed (someone reset their chat PIN): reload keys and resend once
+      const onStale = async () => {
+        const last = lastSentRef.current
+        lastSentRef.current = null
+        await chatKeyStatus().catch(() => {})
+        const key = await fetchPeerKey(selected.id)
+        setPeerKey(key)
+        peerKeyRef.current = key
+        if (last && last.id === selected.id && isChatReady() && key) {
+          socket.emit('send_message', { consultation_id: selected.id, content: seal(last.payload, key), message_type: 'e2e' })
+        }
+      }
+      const onBlocked = (data) => setNotice(data?.message || 'Message not sent.')
       socket.on('new_message', handler)
-      return () => socket.off('new_message', handler)
+      socket.on('e2e_key_stale', onStale)
+      socket.on('message_blocked', onBlocked)
+      return () => {
+        live = false
+        socket.off('new_message', handler)
+        socket.off('e2e_key_stale', onStale)
+        socket.off('message_blocked', onBlocked)
+      }
     }
+    return () => { live = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected])
 
   useEffect(() => {
@@ -142,19 +228,12 @@ export default function ChatPage() {
 
   function sendMessage() {
     if (!input.trim() || !selected) return
-    const socket = getSocket()
-    if (socket) {
-      socket.emit('send_message', {
-        consultation_id: selected.id,
-        content: input.trim(),
-        message_type: 'text',
-      })
-    }
-    setInput('')
+    if (sendText(input.trim())) setInput('') // keep blocked text so it can be edited
   }
 
   return (
     <div className="flex flex-col gap-4 h-[calc(100vh-8rem)]">
+      {modal}
 
       {/* Incoming Request Banner */}
       {incomingRequest && (
@@ -273,6 +352,12 @@ export default function ChatPage() {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+            <p className="mx-auto max-w-sm flex items-start gap-2 text-[11px] leading-snug text-text-secondary bg-surface-light border border-border rounded-xl px-3 py-2 text-center">
+              <Lock size={12} className="mt-0.5 shrink-0 text-orange" />
+              {peerKey
+                ? 'Messages are end-to-end encrypted. No one outside this chat, not even Grahvarta, can read them.'
+                : 'Your chats are secure and encrypted in transit. Your conversation stays private.'}
+            </p>
             {messages.length === 0 && !showGreetings && (
               <p className="text-text-muted text-sm text-center py-8">No messages yet</p>
             )}
@@ -287,7 +372,11 @@ export default function ChatPage() {
                     ? 'bg-orange text-white rounded-br-sm'
                     : 'bg-surface-light text-text-primary rounded-bl-sm border border-border'
                 }`}>
-                  <p>{m.content || m.message}</p>
+                  {m.type === 'e2e_image'
+                    ? <EncryptedImage payload={m.payload} />
+                    : m.type === 'image'
+                      ? <img src={m.content || m.message} alt="Shared in chat" className="max-w-[240px] max-h-[240px] rounded-xl object-cover" />
+                      : <p>{m.content || m.message}</p>}
                   <p className={`text-xs mt-1 ${m.sender_type === 'astrologer' ? 'text-white/60' : 'text-text-muted'}`}>
                     {format(new Date(m.created_at), 'h:mm a')}
                   </p>
@@ -298,8 +387,20 @@ export default function ChatPage() {
           </div>
 
           {/* Input */}
+          {selected.status === 'active' && notice && (
+            <p className="mt-3 rounded-xl bg-error/10 border border-error/20 px-3 py-2 text-xs text-error">{notice}</p>
+          )}
           {selected.status === 'active' && (
             <div className="flex items-center gap-3 pt-4 border-t border-border mt-4">
+              {peerKey && (
+                <>
+                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={sendImage} />
+                  <button onClick={() => fileRef.current?.click()} disabled={sendingImage} aria-label="Send a photo"
+                    className="w-12 h-12 bg-surface-light border border-border rounded-xl flex items-center justify-center text-text-secondary disabled:opacity-40">
+                    <ImagePlus size={18} />
+                  </button>
+                </>
+              )}
               <input
                 className="input-field flex-1"
                 placeholder="Type a message..."

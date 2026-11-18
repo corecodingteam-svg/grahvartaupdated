@@ -44,6 +44,26 @@ router.post('/upload-image', authenticate, (req, res, next) => {
   res.json({ success: true, data: { url: `${baseUrl}/uploads/chat/${req.file.filename}` } });
 });
 
+// Encrypted chat images: the client encrypts the picture before upload, so the
+// server only ever stores opaque bytes (.bin, always served as a download).
+const encUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_, __, cb) => cb(null, uploadDir),
+    filename: (_, __, cb) => cb(null, `${uuidv4()}.bin`),
+  }),
+  limits: { fileSize: 12 * 1024 * 1024 },
+});
+router.post('/upload-encrypted', authenticate, (req, res, next) => {
+  encUpload.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ success: false, message: err.message });
+    next();
+  });
+}, (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, message: 'No file received' });
+  const baseUrl = process.env.APP_URL || 'https://api.grahvarta.com';
+  res.json({ success: true, data: { url: `${baseUrl}/uploads/chat/${req.file.filename}` } });
+});
+
 // Added for the website's user portal — no user-facing "list my
 // consultations" endpoint existed before (only the astrologer-side
 // equivalent in astrologerController.getConsultationHistory). Read-only,

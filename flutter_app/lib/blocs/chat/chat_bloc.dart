@@ -42,7 +42,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<ChatImageUploaded>((event, emit) {
       final updated = state.messages.map((m) {
         if (m.id == event.localId) {
-          return ChatMessage(id: event.localId, content: event.url, senderType: 'user', timestamp: m.timestamp, type: 'image');
+          return ChatMessage(id: event.localId, content: event.url, senderType: 'user', timestamp: m.timestamp, type: event.type);
         }
         return m;
       }).toList();

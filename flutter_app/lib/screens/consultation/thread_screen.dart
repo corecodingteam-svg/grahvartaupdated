@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../services/chat_crypto.dart';
+import '../../widgets/chat_pin_sheet.dart';
+import '../../widgets/encrypted_image.dart';
 import '../../widgets/secure_chat_notice.dart';
 
 class ThreadScreen extends StatefulWidget {
@@ -56,7 +59,12 @@ class _ThreadScreenState extends State<ThreadScreen> {
     }
     try {
       final data = await ApiService.getThreadMessages(widget.astrologerId);
-      final msgs = List<dynamic>.from(data['messages'] ?? []);
+      var msgs = List<dynamic>.from(data['messages'] ?? []);
+      // Encrypted chats need this device's chat key; ask for the PIN if it isn't unlocked yet
+      if (msgs.any((m) => m['message_type'] == 'e2e') && !ChatCrypto.instance.isReady && mounted) {
+        await ensureChatUnlocked(context);
+      }
+      msgs = ChatCrypto.instance.decryptRows(msgs);
       if (mounted) {
         setState(() {
           _messages = msgs;
@@ -77,7 +85,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
     setState(() => _loadingMore = true);
     try {
       final data = await ApiService.getThreadMessages(widget.astrologerId, before: _oldestTimestamp);
-      final older = List<dynamic>.from(data['messages'] ?? []);
+      final older = ChatCrypto.instance.decryptRows(List<dynamic>.from(data['messages'] ?? []));
       if (mounted) {
         setState(() {
           _messages = [...older, ..._messages];
@@ -256,6 +264,12 @@ class _ThreadScreenState extends State<ThreadScreen> {
     final isUser = role == 'user';
     final isImage = type == 'image';
     final content = msg['message'] ?? msg['content'] ?? '';
+    final bubbleBorderRadiusE2e = BorderRadius.only(
+      topLeft: const Radius.circular(18),
+      topRight: const Radius.circular(18),
+      bottomLeft: Radius.circular(isUser ? 18 : 4),
+      bottomRight: Radius.circular(isUser ? 4 : 18),
+    );
     final bubbleBorderRadius = BorderRadius.only(
       topLeft: const Radius.circular(18),
       topRight: const Radius.circular(18),
@@ -264,7 +278,9 @@ class _ThreadScreenState extends State<ThreadScreen> {
     );
 
     Widget bubbleContent;
-    if (isImage) {
+    if (type == 'e2e_image') {
+      bubbleContent = EncryptedImage(payloadJson: content, borderRadius: bubbleBorderRadiusE2e);
+    } else if (isImage) {
       bubbleContent = GestureDetector(
         onTap: () => Navigator.push(context, MaterialPageRoute(
           builder: (_) => _ThreadFullscreenImage(url: content),

@@ -1,3 +1,4 @@
+import { clearChatKey } from '../lib/chatCrypto'
 import { createContext, useContext, useState, useEffect } from 'react'
 import { authAPI, astrologerAPI } from '../services/api'
 import { connectSocket, disconnectSocket } from '../services/socket'
@@ -72,6 +73,7 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
+    clearChatKey()
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     setUser(null)

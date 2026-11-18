@@ -14,6 +14,7 @@ import 'astrologer_chat_history_screen.dart';
 import 'astrologer_pending_screen.dart';
 import 'astrologer_consultations_screen.dart';
 import 'astrologer_chat_screen.dart';
+import '../../widgets/chat_pin_sheet.dart';
 import 'astrologer_call_screen.dart';
 
 class AstrologerMainScreen extends StatefulWidget {
@@ -47,6 +48,10 @@ class _AstrologerMainScreenState extends State<AstrologerMainScreen> with Single
       const AstrologerCommunityScreen(),
     ];
     _overlayCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
+    // Set up / unlock encrypted chat once at start, so accepting a chat later is instant
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ensureChatUnlocked(context);
+    });
     _overlayScale = CurvedAnimation(parent: _overlayCtrl, curve: Curves.elasticOut);
     _overlayFade = CurvedAnimation(parent: _overlayCtrl, curve: Curves.easeOut);
     _setupSocket();
@@ -145,12 +150,16 @@ class _AstrologerMainScreenState extends State<AstrologerMainScreen> with Single
     } catch (_) {}
   }
 
-  void _acceptRequest(Map<String, dynamic> req) {
+  Future<void> _acceptRequest(Map<String, dynamic> req) async {
     _stopRingtone();
+    final type = req['type'] ?? 'chat';
+    // Chats are end-to-end encrypted: unlock the chat key before accepting,
+    // so the user isn't billed while the astrologer enters their PIN.
+    if (type == 'chat' && !await ensureChatUnlocked(context)) return;
+    if (!mounted) return;
     SocketService.instance.acceptConsultation(req['consultation_id']);
     _cubit.clearIncomingRequest();
 
-    final type = req['type'] ?? 'chat';
     if (type == 'chat') {
       Navigator.push(context, MaterialPageRoute(
         builder: (_) => AstrologerChatScreen(

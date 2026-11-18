@@ -7,6 +7,8 @@ import '../../cubits/chat_cubit.dart';
 import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/secure_chat_notice.dart';
+import '../../widgets/chat_pin_sheet.dart';
+import '../../widgets/encrypted_image.dart';
 import '../../utils/block_user.dart';
 import '../../utils/contact_filter.dart';
 
@@ -31,8 +33,22 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
   void initState() {
     super.initState();
     _cubit = ChatCubit(consultationId: widget.consultationId, userId: widget.userId);
-    _cubit.loadHistory().then((_) => _scrollBottom());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
+  }
+
+  /// Chats are end-to-end encrypted: make sure this device has the chat key
+  /// (asking for the chat PIN if needed) before loading and sending messages.
+  Future<void> _start() async {
+    final ok = await ensureChatUnlocked(context);
+    if (!mounted) return;
+    if (!ok) {
+      Navigator.of(context).pop();
+      return;
+    }
     _setupSocket();
+    await _cubit.loadHistory();
+    if (mounted) setState(() {});
+    _scrollBottom();
   }
 
   @override
@@ -42,6 +58,7 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
     SocketService.instance.off('peer_typing');
     SocketService.instance.off('consultation_ended');
     SocketService.instance.off('message_blocked');
+    SocketService.instance.off('e2e_key_stale');
     _ctrl.dispose();
     _scroll.dispose();
     _cubit.close();
@@ -67,6 +84,10 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
     socket.on('peer_typing', (data) {
       if (!mounted) return;
       _cubit.setPeerTyping((data as Map)['is_typing'] == true);
+    });
+    socket.on('e2e_key_stale', (_) async {
+      await _cubit.onKeyStale();
+      if (mounted) setState(() {});
     });
     socket.on('message_blocked', (data) {
       if (!mounted) return;
@@ -151,6 +172,8 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
     final detected = ContactFilter.detect(text);
     if (detected.isNotEmpty) {
       _showRuleSnack(ContactFilter.blockedMessage(detected));
+      // The server can't read encrypted chats, so the app reports the attempt itself
+      SocketService.instance.emit('report_blocked_message', {'consultation_id': widget.consultationId, 'detected': detected, 'content': text});
       return;
     }
     _cubit.sendTextMessage(text);
@@ -302,7 +325,7 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
                       ? _buildShimmer(context)
                       : state.messages.isEmpty
                           ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                              const SecureChatNotice(),
+                              SecureChatNotice(endToEnd: _cubit.peerKey != null),
                               Text('No messages yet', style: TextStyle(color: context.clr.txtMuted)),
                             ]))
                           : ListView.builder(
@@ -310,7 +333,7 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
                               padding: const EdgeInsets.all(16),
                               itemCount: state.messages.length + 1,
                               itemBuilder: (_, i) {
-                                if (i == 0) return const SecureChatNotice();
+                                if (i == 0) return SecureChatNotice(endToEnd: _cubit.peerKey != null);
                                 final m = state.messages[i - 1];
                                 return _AnimatedBubble(
                                   key: ValueKey(m['id'] ?? m['created_at'] ?? i),
@@ -376,6 +399,7 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
     final isMe = senderType == 'astrologer';
     final msgType = msg['type'] ?? 'text';
     final isImage = msgType == 'image';
+    final isE2eImage = msgType == 'e2e_image';
     final isUploading = msgType == 'image_uploading';
     final borderRadius = BorderRadius.only(
       topLeft: const Radius.circular(16),
@@ -391,6 +415,8 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
         decoration: BoxDecoration(color: isMe ? context.clr.accent : context.clr.card, borderRadius: borderRadius),
         child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
       );
+    } else if (isE2eImage) {
+      content = EncryptedImage(payloadJson: (msg['content'] ?? msg['message'] ?? '') as String, borderRadius: borderRadius);
     } else if (isImage) {
       final url = msg['content'] ?? msg['message'] ?? '';
       content = GestureDetector(

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../cubits/chat_history_cubit.dart';
 import '../../theme/app_theme.dart';
+import '../../services/chat_crypto.dart';
 import 'astrologer_user_thread_screen.dart';
 
 class AstrologerChatHistoryScreen extends StatelessWidget {
@@ -175,7 +176,7 @@ class _ThreadTile extends StatelessWidget {
             const SizedBox(height: 3),
             Row(children: [
               Expanded(child: Text(
-                thread['last_message']?.toString() ?? 'Start a conversation',
+                thread['last_message'] == null ? 'Start a conversation' : ChatCrypto.instance.previewOf(thread['last_message']?.toString()),
                 style: TextStyle(
                   color: unread > 0 ? context.clr.txtSecondary : context.clr.txtMuted,
                   fontSize: 12,

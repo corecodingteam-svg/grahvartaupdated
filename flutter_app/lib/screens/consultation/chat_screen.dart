@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -11,6 +12,9 @@ import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/secure_chat_notice.dart';
+import '../../widgets/chat_pin_sheet.dart';
+import '../../widgets/encrypted_image.dart';
+import '../../services/chat_crypto.dart';
 import '../../utils/contact_filter.dart';
 import 'chat_history_screen.dart';
 
@@ -41,12 +45,55 @@ class _ChatScreenState extends State<ChatScreen> {
   late final ChatBloc _bloc;
   bool _dialogShown = false;
 
+  // End-to-end encryption: the astrologer's public key for this consultation.
+  // Null when they are on an older app without encrypted chat.
+  String? _peerKey;
+  bool get _e2e => _peerKey != null && ChatCrypto.instance.isReady;
+  Map<String, dynamic>? _lastSent; // resent once if a key changed mid-chat
+
   @override
   void initState() {
     super.initState();
     _bloc = ChatBloc();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
+  }
+
+  /// Unlocks this device's chat key (asking for the chat PIN if needed)
+  /// before the consultation is requested, so nothing is billed if the user backs out.
+  Future<void> _start() async {
+    final ok = await ensureChatUnlocked(context);
+    if (!mounted) return;
+    if (!ok) {
+      Navigator.of(context).pop();
+      return;
+    }
     _loadHistory();
     _initSocket();
+  }
+
+  Future<void> _refreshPeerKey() async {
+    final id = _bloc.state.consultationId;
+    if (id == null) return;
+    final key = await ChatCrypto.instance.peerKey(id);
+    if (mounted) setState(() => _peerKey = key);
+  }
+
+  /// Turns a stored or received message into what the bubble shows.
+  ({String content, String type}) _decode(String? content, String type) {
+    if (type != 'e2e') return (content: content ?? '', type: type);
+    final p = content == null ? null : ChatCrypto.instance.open(content);
+    if (p == null) return (content: '🔒 This message can\'t be shown on this device', type: 'text');
+    if (p['t'] == 'image') return (content: jsonEncode(p), type: 'e2e_image');
+    return (content: p['b'] as String? ?? '', type: 'text');
+  }
+
+  void _sendPayload(String consultationId, Map<String, dynamic> payload, {String? plain, String plainType = 'text'}) {
+    if (_e2e) {
+      _lastSent = {'cid': consultationId, 'payload': payload};
+      _socket.sendMessage(consultationId, ChatCrypto.instance.seal(payload, _peerKey!), type: 'e2e');
+    } else if (plain != null) {
+      _socket.sendMessage(consultationId, plain, type: plainType);
+    }
   }
 
   String _sessionLabel(String? iso, String msgType) {
@@ -82,10 +129,10 @@ class _ChatScreenState extends State<ChatScreen> {
           id: m['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
           content: isSession
               ? _sessionLabel(m['created_at']?.toString(), msgType)
-              : (m['message'] as String? ?? m['content'] as String? ?? ''),
+              : _decode(m['message'] as String? ?? m['content'] as String?, msgType).content,
           senderType: isSession ? 'system' : (m['sender_type'] as String? ?? m['sender_role'] as String? ?? 'user'),
           timestamp: m['created_at'] != null ? DateTime.tryParse(m['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
-          type: isSession ? 'text' : msgType,
+          type: isSession ? 'text' : _decode(m['message'] as String? ?? m['content'] as String?, msgType).type,
         );
       }).toList();
       if (mounted) _bloc.add(ChatHistoryLoaded(history));
@@ -118,10 +165,12 @@ class _ChatScreenState extends State<ChatScreen> {
         position: data['position'] as int? ?? 1,
         estimatedWait: data['estimated_wait'] as int? ?? 5,
       ));
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshPeerKey());
     });
 
     _socket.on('consultation_started', (data) {
       _bloc.add(ChatConsultationStarted());
+      _refreshPeerKey();
       _bloc.add(ChatSystemMessage('Consultation started. You are being charged ₹${widget.astrologer.perMinuteRateChat.toInt()}/min'));
       // Fetch current wallet balance to display in billing bar
       ApiService.getWallet().then((wallet) {
@@ -131,12 +180,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
     _socket.on('new_message', (data) {
       if (data['sender_type'] != 'user') {
+        final d = _decode(data['content'] as String?, (data['message_type'] ?? data['type'] ?? 'text') as String);
         _bloc.add(ChatMessageReceived(ChatMessage(
           id: data['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-          content: data['content'] ?? '',
+          content: d.content,
           senderType: data['sender_type'],
           timestamp: DateTime.now(),
-          type: data['message_type'] ?? data['type'] ?? 'text',
+          type: d.type,
         )));
         _scrollToBottom();
       }
@@ -190,6 +240,19 @@ class _ChatScreenState extends State<ChatScreen> {
       _bloc.add(ChatSystemMessage('⚠️ Insufficient balance. Required: ₹${data['required']}'));
     });
 
+    // A chat key changed (someone reset their chat PIN): reload keys and resend once
+    _socket.on('e2e_key_stale', (_) async {
+      final last = _lastSent;
+      _lastSent = null;
+      await ChatCrypto.instance.status();
+      await _refreshPeerKey();
+      if (last != null && _e2e) {
+        _socket.sendMessage(last['cid'] as String, ChatCrypto.instance.seal(Map<String, dynamic>.from(last['payload'] as Map), _peerKey!), type: 'e2e');
+      } else if (!ChatCrypto.instance.isReady && mounted) {
+        _bloc.add(ChatSystemMessage('⚠️ Your chat is locked on this device. Reopen the chat to unlock it.'));
+      }
+    });
+
     // Server-side safety net for the contact-details rule
     _socket.on('message_blocked', (data) {
       if (!mounted) return;
@@ -223,11 +286,13 @@ class _ChatScreenState extends State<ChatScreen> {
     final detected = ContactFilter.detect(text);
     if (detected.isNotEmpty) {
       _showContactBlocked(ContactFilter.blockedMessage(detected));
+      // The server can't read encrypted chats, so the app reports the attempt itself
+      _socket.emit('report_blocked_message', {'consultation_id': state.consultationId, 'detected': detected, 'content': text});
       return; // keep the text so the user can edit it
     }
 
     _bloc.add(ChatMessageSent(text));
-    _socket.sendMessage(state.consultationId!, text);
+    _sendPayload(state.consultationId!, {'t': 'text', 'b': text}, plain: text);
     _socket.sendTypingStop(state.consultationId!);
     _messageCtrl.clear();
     _scrollToBottom();
@@ -290,9 +355,16 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     try {
-      final url = await ApiService.uploadChatImage(File(picked.path));
-      _bloc.add(ChatImageUploaded(localId, url));
-      _socket.sendMessage(state.consultationId!, url, type: 'image');
+      if (_e2e) {
+        final bytes = await File(picked.path).readAsBytes();
+        final payload = await ChatCrypto.instance.uploadEncryptedImage(bytes, picked.mimeType ?? 'image/jpeg');
+        _bloc.add(ChatImageUploaded(localId, jsonEncode(payload), type: 'e2e_image'));
+        _sendPayload(state.consultationId!, payload);
+      } else {
+        final url = await ApiService.uploadChatImage(File(picked.path));
+        _bloc.add(ChatImageUploaded(localId, url));
+        _socket.sendMessage(state.consultationId!, url, type: 'image');
+      }
       _scrollToBottom();
     } catch (_) {
       _bloc.add(ChatImageUploadFailed(localId));
@@ -441,6 +513,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _socket.off('insufficient_balance');
     _socket.off('error');
     _socket.off('message_blocked');
+    _socket.off('e2e_key_stale');
     _socket.reset();
     _bloc.close();
     super.dispose();
@@ -612,7 +685,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildMessages(ChatState state) {
     if (state.messages.isEmpty) {
       return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const SecureChatNotice(),
+        SecureChatNotice(endToEnd: _peerKey != null || _bloc.state.consultationId == null),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(20),
@@ -643,7 +716,7 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: const EdgeInsets.all(16),
       itemCount: state.messages.length + 1,
       itemBuilder: (_, i) {
-        if (i == 0) return const SecureChatNotice();
+        if (i == 0) return SecureChatNotice(endToEnd: _peerKey != null || _bloc.state.consultationId == null);
         final m = state.messages[i - 1];
         return _AnimatedBubble(key: ValueKey(m.id), child: _buildMessageBubble(m));
       },
@@ -668,6 +741,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final isUser = msg.senderType == 'user';
     final isImage = msg.type == 'image';
+    final isE2eImage = msg.type == 'e2e_image';
     final isUploading = msg.type == 'image_uploading';
     final borderRadius = BorderRadius.only(
       topLeft: const Radius.circular(18),
@@ -683,6 +757,8 @@ class _ChatScreenState extends State<ChatScreen> {
         decoration: BoxDecoration(color: isUser ? context.clr.accent : context.clr.card, borderRadius: borderRadius),
         child: Center(child: CircularProgressIndicator(color: context.clr.onAccent, strokeWidth: 2)),
       );
+    } else if (isE2eImage) {
+      bubbleContent = EncryptedImage(payloadJson: msg.content, borderRadius: borderRadius);
     } else if (isImage) {
       bubbleContent = GestureDetector(
         onTap: () => _openFullscreen(msg.content),

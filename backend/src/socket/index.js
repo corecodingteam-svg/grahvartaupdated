@@ -4,6 +4,7 @@ const { BillingEngine } = require('./billingEngine');
 const { sendPushNotification } = require('../controllers/liveController');
 const { saveMessage, insertSessionDivider } = require('../controllers/threadController');
 const { detectContactInfo, blockedMessageText } = require('../utils/contactFilter');
+const { parseEnvelope, partyKeys } = require('../utils/chatE2e');
 const transcription = require('../utils/transcription');
 
 const billingEngines = new Map(); // consultationId -> BillingEngine
@@ -414,8 +415,27 @@ function initSocket(io) {
         // Sender role comes from the consultation itself, never from the client
         const party = await partyOf(consultation_id);
         if (!party) return;
-        if (typeof content !== 'string' || !content.trim() || content.length > 5000) return;
-        if (!['text', 'image'].includes(message_type)) return;
+        if (!['text', 'image', 'e2e'].includes(message_type)) return;
+        if (typeof content !== 'string' || !content.trim()) return;
+        if (message_type !== 'e2e' && content.length > 5000) return;
+
+        // End-to-end encryption: once both people have chat keys, only encrypted
+        // envelopes addressed to their current keys are accepted. The server
+        // cannot read them; the contact filter runs on the sender's device.
+        const keys = await partyKeys(consultation_id);
+        const bothHaveKeys = !!(keys && keys.user.publicKey && keys.astrologer.publicKey);
+        if (message_type === 'e2e') {
+          const env = parseEnvelope(content);
+          if (!env) return;
+          const mine = keys?.[party]?.publicKey;
+          const theirs = keys?.[party === 'user' ? 'astrologer' : 'user']?.publicKey;
+          if (!mine || !theirs || env.s !== mine || env.r !== theirs) {
+            // Sender used an outdated key (someone reset their chat PIN) — tell it to refresh and resend
+            return socket.emit('e2e_key_stale', { consultation_id, my_key: mine || null, peer_key: theirs || null });
+          }
+        } else if (bothHaveKeys) {
+          return socket.emit('e2e_key_stale', { consultation_id, my_key: keys[party].publicKey, peer_key: keys[party === 'user' ? 'astrologer' : 'user'].publicKey });
+        }
 
         // Reset inactivity timer
         const engine = billingEngines.get(consultation_id);
@@ -466,6 +486,31 @@ function initSocket(io) {
         io.to(`consultation:${consultation_id}`).emit('new_message', msg.rows[0]);
       } catch (err) {
         console.error('Message error:', err);
+      }
+    });
+
+    // ─── BLOCKED ON THE DEVICE ───────────────────────────────────
+    // With end-to-end encryption the contact filter runs in the app. A message
+    // it stops is never sent to the other person; the app reports the attempt
+    // here so the Violators page keeps working.
+    socket.on('report_blocked_message', async ({ consultation_id, detected, content }) => {
+      try {
+        const party = await partyOf(consultation_id);
+        if (!party) return;
+        const kinds = Array.isArray(detected) ? detected.filter(d => d === 'phone' || d === 'email') : [];
+        if (!kinds.length) return;
+        // Re-check on the server so a client cannot file false violations
+        const text = typeof content === 'string' ? content.slice(0, 2000) : '';
+        if (!detectContactInfo(text).blocked) return;
+        const room = activeRooms.get(consultation_id);
+        await db.query(
+          `INSERT INTO rule_violations (user_id, role, astrologer_id, consultation_id, violation_type, detected, content, channel)
+           VALUES ($1, $2, $3, $4, 'contact_sharing', $5, $6, 'consultation_chat')`,
+          [userId, party, party === 'astrologer' ? socket.astrologerId || null : (room?.astrologerId || null),
+           consultation_id, [...new Set(kinds)], text]
+        );
+      } catch (err) {
+        console.error('[violation] device report failed:', err.message);
       }
     });
 

@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
+import '../services/chat_crypto.dart';
 
 // --------------- State ---------------
 
@@ -44,8 +46,39 @@ class ChatCubit extends Cubit<ChatState> {
 
   ChatCubit({required this.consultationId, this.userId}) : super(const ChatState());
 
+  /// The user's public key for end-to-end encryption; null if they are on an
+  /// older app version without encrypted chat (messages then go unencrypted).
+  String? peerKey;
+  bool get e2e => peerKey != null && ChatCrypto.instance.isReady;
+  Map<String, dynamic>? _lastSent; // resent once if a key changed mid-chat
+
+  Future<void> refreshPeerKey() async {
+    peerKey = await ChatCrypto.instance.peerKey(consultationId);
+  }
+
+  void _send(Map<String, dynamic> payload, {String? plain, String plainType = 'text'}) {
+    if (e2e) {
+      _lastSent = payload;
+      SocketService.instance.sendMessage(consultationId, ChatCrypto.instance.seal(payload, peerKey!), type: 'e2e');
+    } else if (plain != null) {
+      SocketService.instance.sendMessage(consultationId, plain, type: plainType);
+    }
+  }
+
+  /// Called when the server says a chat key changed: reload keys and resend the last message once.
+  Future<void> onKeyStale() async {
+    final last = _lastSent;
+    _lastSent = null;
+    await ChatCrypto.instance.status();
+    await refreshPeerKey();
+    if (last != null && e2e) {
+      SocketService.instance.sendMessage(consultationId, ChatCrypto.instance.seal(last, peerKey!), type: 'e2e');
+    }
+  }
+
   Future<void> loadHistory() async {
     final msgs = <Map<String, dynamic>>[];
+    await refreshPeerKey().catchError((_) {});
 
     if (userId != null && userId!.isNotEmpty) {
       try {
@@ -53,7 +86,7 @@ class ChatCubit extends Cubit<ChatState> {
         final old = List<dynamic>.from(data['messages'] ?? []);
         if (old.isNotEmpty) {
           msgs.addAll(old.map((m) {
-            final map = Map<String, dynamic>.from(m as Map);
+            final map = ChatCrypto.instance.decodeRow(m as Map);
             map['type'] = map['message_type'] ?? map['type'] ?? 'text';
             return map;
           }));
@@ -65,7 +98,7 @@ class ChatCubit extends Cubit<ChatState> {
     try {
       final current = await ApiService.getAstrologerConsultationMessages(consultationId);
       msgs.addAll(current.map((m) {
-        final map = Map<String, dynamic>.from(m as Map);
+        final map = ChatCrypto.instance.decodeRow(m as Map);
         map['type'] = map['message_type'] ?? map['type'] ?? 'text';
         return map;
       }));
@@ -76,7 +109,7 @@ class ChatCubit extends Cubit<ChatState> {
   }
 
   void addMessage(Map<String, dynamic> msg) {
-    emit(state.copyWith(messages: [...state.messages, msg]));
+    emit(state.copyWith(messages: [...state.messages, ChatCrypto.instance.decodeRow(msg)]));
   }
 
   void updateBillingTick(int seconds) {
@@ -94,7 +127,7 @@ class ChatCubit extends Cubit<ChatState> {
   void sendTextMessage(String text) {
     if (text.isEmpty || state.isEnded) return;
     SocketService.instance.sendTypingStop(consultationId);
-    SocketService.instance.sendMessage(consultationId, text);
+    _send({'t': 'text', 'b': text}, plain: text);
     addMessage({
       'sender_type': 'astrologer',
       'content': text,
@@ -113,7 +146,17 @@ class ChatCubit extends Cubit<ChatState> {
     });
 
     try {
-      final url = await ApiService.uploadChatImage(imageFile);
+      final encrypted = e2e;
+      Map<String, dynamic>? payload;
+      String url;
+      if (encrypted) {
+        final ext = imageFile.path.split('.').last.toLowerCase();
+        payload = await ChatCrypto.instance.uploadEncryptedImage(
+            await imageFile.readAsBytes(), ext == 'png' ? 'image/png' : 'image/jpeg');
+        url = jsonEncode(payload);
+      } else {
+        url = await ApiService.uploadChatImage(imageFile);
+      }
       final updated = List<Map<String, dynamic>>.from(state.messages);
       final idx = updated.indexWhere((m) => m['id'] == localId);
       if (idx != -1) {
@@ -121,12 +164,16 @@ class ChatCubit extends Cubit<ChatState> {
           'id': localId,
           'sender_type': 'astrologer',
           'content': url,
-          'type': 'image',
+          'type': encrypted ? 'e2e_image' : 'image',
           'created_at': DateTime.now().toIso8601String(),
         };
       }
       emit(state.copyWith(messages: updated));
-      SocketService.instance.sendMessage(consultationId, url, type: 'image');
+      if (encrypted) {
+        _send(payload!);
+      } else {
+        SocketService.instance.sendMessage(consultationId, url, type: 'image');
+      }
     } catch (_) {
       final updated = List<Map<String, dynamic>>.from(state.messages);
       final idx = updated.indexWhere((m) => m['id'] == localId);
