@@ -18,7 +18,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 const AndroidNotificationChannel _channel = AndroidNotificationChannel(
   'grahvarta_astrology_high_importance',
-  'Grahvarta Astrology Notifications',
+  'Grahvarta Astro Notifications',
   importance: Importance.high,
   playSound: true,
 );
@@ -34,7 +34,7 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
     ));
     await plugin.show(
       message.hashCode,
-      message.data['title'] ?? 'Grahvarta Astrology',
+      message.data['title'] ?? 'Grahvarta Astro',
       message.data['body'] ?? '',
       NotificationDetails(
         android: AndroidNotificationDetails(
@@ -216,7 +216,7 @@ class _AstroTalkAppState extends State<AstroTalkApp> {
       ],
       child: Consumer2<LocaleProvider, ThemeProvider>(
         builder: (_, localeProvider, themeProvider, __) => MaterialApp(
-          title: 'Grahvarta Astrology',
+          title: 'Grahvarta Astro',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,

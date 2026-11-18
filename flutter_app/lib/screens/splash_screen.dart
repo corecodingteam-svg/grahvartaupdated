@@ -23,7 +23,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   late final Animation<double> _starsFade;
   late final Animation<double> _mandalaOpacity;
   late final Animation<double> _mandalaScale;
-  late final Animation<double> _mandalaReveal;
   late final Animation<double> _textFade;
   late final Animation<Offset> _textSlide;
   late final Animation<double> _taglineFade;
@@ -58,8 +57,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     _mandalaScale = Tween<double>(begin: 0.45, end: 1.0).animate(
         CurvedAnimation(parent: _entryController, curve: const Interval(0.08, 0.55, curve: Curves.elasticOut)));
 
-    _mandalaReveal = Tween<double>(begin: 0, end: 1).animate(
-        CurvedAnimation(parent: _entryController, curve: const Interval(0.12, 0.60, curve: Curves.easeOut)));
 
     _textFade = Tween<double>(begin: 0, end: 1).animate(
         CurvedAnimation(parent: _entryController, curve: const Interval(0.48, 0.72, curve: Curves.easeOut)));
@@ -159,17 +156,16 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Mandala
+                  // Brand logo (same as the store listing icon), fades + zooms in
                   Opacity(
                     opacity: _mandalaOpacity.value,
                     child: Transform.scale(
                       scale: _mandalaScale.value,
-                      child: Transform.rotate(
-                        angle: _rotController.value * 2 * pi,
-                        child: CustomPaint(
-                          size: const Size(150, 150),
-                          painter: _MandalaPainter(_mandalaReveal.value, accent, accentAlt),
-                        ),
+                      child: Image.asset(
+                        'assets/images/logo_transparent.png',
+                        width: 150,
+                        height: 150,
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),
@@ -272,112 +268,3 @@ class _StarsPainter extends CustomPainter {
 }
 
 // ── Mandala ──────────────────────────────────────────────────────────────────
-
-class _MandalaPainter extends CustomPainter {
-  final double reveal; // 0..1
-  final Color accent;
-  final Color accentAlt;
-  const _MandalaPainter(this.reveal, this.accent, this.accentAlt);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height / 2);
-    final r = size.width / 2;
-
-    // Soft outer glow
-    canvas.drawCircle(
-      c,
-      r * 0.92,
-      Paint()
-        ..color = accent.withValues(alpha: 0.12 * reveal)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18),
-    );
-
-    // Concentric rings drawn as arcs (reveal 0→1)
-    _drawArc(canvas, c, r * 0.90, accent.withValues(alpha: 0.9), 1.6, reveal);
-    _drawArc(canvas, c, r * 0.70, accentAlt.withValues(alpha: 0.55), 1.0, reveal);
-    _drawArc(canvas, c, r * 0.50, accent.withValues(alpha: 0.35), 0.8, reveal);
-
-    // 12 spokes (zodiac-style), each extending progressively
-    for (int i = 0; i < 12; i++) {
-      final angle = i * pi / 6;
-      final spokeReveal = ((reveal * 14) - i).clamp(0.0, 1.0);
-      if (spokeReveal <= 0) continue;
-
-      final inner = Offset(c.dx + r * 0.50 * cos(angle), c.dy + r * 0.50 * sin(angle));
-      final outer = Offset(c.dx + r * 0.90 * cos(angle), c.dy + r * 0.90 * sin(angle));
-      final tip = Offset.lerp(inner, outer, spokeReveal)!;
-
-      canvas.drawLine(
-        inner,
-        tip,
-        Paint()
-          ..color = accent.withValues(alpha: 0.28 * spokeReveal)
-          ..strokeWidth = 0.9
-          ..strokeCap = StrokeCap.round,
-      );
-
-      // Small dot at the outer ring junction
-      if (spokeReveal > 0.85) {
-        canvas.drawCircle(
-          outer,
-          2.2,
-          Paint()..color = accent.withValues(alpha: 0.85 * ((spokeReveal - 0.85) / 0.15)),
-        );
-      }
-    }
-
-    // Center radial gradient fill
-    if (reveal > 0) {
-      final cr = r * 0.28 * reveal;
-      canvas.drawCircle(
-        c,
-        cr,
-        Paint()
-          ..shader = RadialGradient(colors: [
-            accent.withValues(alpha: 0.85),
-            accent.withValues(alpha: 0.0),
-          ]).createShader(Rect.fromCircle(center: c, radius: cr)),
-      );
-    }
-
-    // 8-point star burst (appears last)
-    if (reveal > 0.65) {
-      final burst = ((reveal - 0.65) / 0.35).clamp(0.0, 1.0);
-      _drawStarBurst(canvas, c, r * 0.18 * burst, accentAlt.withValues(alpha: 0.9 * burst));
-    }
-  }
-
-  void _drawArc(Canvas canvas, Offset center, double radius, Color color, double strokeWidth, double progress) {
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -pi / 2,
-      2 * pi * progress,
-      false,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round,
-    );
-  }
-
-  void _drawStarBurst(Canvas canvas, Offset center, double radius, Color color) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.4
-      ..strokeCap = StrokeCap.round;
-    for (int i = 0; i < 8; i++) {
-      final a = i * pi / 4;
-      canvas.drawLine(
-        Offset(center.dx + radius * 0.25 * cos(a), center.dy + radius * 0.25 * sin(a)),
-        Offset(center.dx + radius * cos(a), center.dy + radius * sin(a)),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_MandalaPainter old) =>
-      old.reveal != reveal || old.accent != accent || old.accentAlt != accentAlt;
-}

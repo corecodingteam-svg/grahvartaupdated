@@ -118,14 +118,10 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 56, height: 56,
-          decoration: BoxDecoration(
-            color: accentColor.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: accentColor.withOpacity(0.3)),
-          ),
-          child: Icon(isAstro ? Icons.star_rounded : Icons.auto_awesome, color: accentColor, size: 28),
+        // Store-listing logos: astrologer badge for astrologer sign-in, brand wheel otherwise
+        Image.asset(
+          isAstro ? 'assets/images/logo_astrologer_badge_transparent.png' : 'assets/images/logo_transparent.png',
+          width: 72, height: 72, fit: BoxFit.contain,
         ),
         const SizedBox(height: 24),
         Text(

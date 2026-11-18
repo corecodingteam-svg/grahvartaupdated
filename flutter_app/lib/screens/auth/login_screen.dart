@@ -82,15 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 56, height: 56,
-          decoration: BoxDecoration(
-            color: context.clr.accent.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: context.clr.accent.withValues(alpha: 0.3)),
-          ),
-          child: Icon(Icons.auto_awesome, color: context.clr.accent, size: 28),
-        ),
+        Image.asset('assets/images/logo_transparent.png', width: 72, height: 72, fit: BoxFit.contain),
         const SizedBox(height: 24),
         Text(
           s.welcomeBack,
