@@ -41,6 +41,7 @@ const migrations = [
   '034_backfill_min_charge_earnings.sql',
   '035_chat_e2e.sql',
   '036_astrologer_tools.sql',
+  '037_absolute_photo_urls.sql',
 ];
 
 // Migrations that existed before the _migrations tracking table was introduced.

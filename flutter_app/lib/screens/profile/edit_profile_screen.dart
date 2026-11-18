@@ -78,7 +78,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       String? avatarUrl;
       if (_pickedImage != null) {
         final result = await ApiService.uploadAvatar(_pickedImage!);
-        avatarUrl = result['avatar_url'] as String?;
+        avatarUrl = ApiService.mediaUrl(result['avatar_url']);
       }
 
       final payload = <String, dynamic>{

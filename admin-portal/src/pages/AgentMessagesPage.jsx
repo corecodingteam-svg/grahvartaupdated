@@ -37,7 +37,7 @@ function MessageCard({ m, onChanged }) {
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           {m.profile_picture_url ? (
-            <img src={`https://api.grahvarta.com${m.profile_picture_url}`} alt="" className="w-10 h-10 rounded-full object-cover border border-border" />
+            <img src={m.profile_picture_url.startsWith("http") ? m.profile_picture_url : `https://api.grahvarta.com${m.profile_picture_url}`} alt="" className="w-10 h-10 rounded-full object-cover border border-border" />
           ) : (
             <div className="w-10 h-10 rounded-full bg-surface-light flex items-center justify-center font-bold text-orange">
               {(m.agent_name || '?')[0]?.toUpperCase()}

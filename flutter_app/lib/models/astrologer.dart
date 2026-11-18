@@ -1,3 +1,4 @@
+import '../services/api_service.dart';
 String _toTitleCase(String s) =>
     s.split(' ').map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}').join(' ');
 
@@ -63,7 +64,7 @@ class Astrologer {
       userId: json['user_id'] ?? '',
       displayName: _toTitleCase(json['display_name'] ?? json['name'] ?? ''),
       bio: json['bio'],
-      avatarUrl: json['avatar_url'],
+      avatarUrl: ApiService.mediaUrl(json['avatar_url']),
       experienceYears: json['experience_years'] ?? 0,
       languages: parseList(json['languages']),
       specializations: parseList(json['specializations']),
@@ -281,10 +282,10 @@ class LiveSession {
     id: json['id'] ?? '',
     astrologerId: json['astrologer_id'] ?? '',
     astrologerName: json['astrologer_name'] ?? '',
-    avatarUrl: json['avatar_url'],
+    avatarUrl: ApiService.mediaUrl(json['avatar_url']),
     title: json['title'] ?? '',
     description: json['description'],
-    thumbnailUrl: json['thumbnail_url'],
+    thumbnailUrl: ApiService.mediaUrl(json['thumbnail_url']),
     status: json['status'] ?? 'scheduled',
     viewerCount: json['viewer_count'] ?? 0,
     totalTips: double.tryParse(json['total_tips']?.toString() ?? '0') ?? 0,

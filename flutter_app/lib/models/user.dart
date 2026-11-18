@@ -1,3 +1,4 @@
+import '../services/api_service.dart';
 class User {
   final String id;
   final String email;
@@ -32,7 +33,7 @@ class User {
       id: json['id'] ?? '',
       email: json['email'] ?? '',
       name: json['name'] ?? '',
-      avatarUrl: json['avatar_url'],
+      avatarUrl: ApiService.mediaUrl(json['avatar_url']),
       dateOfBirth: json['date_of_birth'],
       timeOfBirth: json['time_of_birth'],
       birthPlace: json['birth_place'],
@@ -127,7 +128,7 @@ class AudioContent {
       title: json['title'] ?? '',
       description: json['description'],
       category: json['category'] ?? '',
-      thumbnailUrl: json['thumbnail_url'],
+      thumbnailUrl: ApiService.mediaUrl(json['thumbnail_url']),
       audioUrl: json['audio_url'],
       durationSeconds: json['duration_seconds'],
       planetTheme: json['planet_theme'],
@@ -175,7 +176,7 @@ class Course {
       id: json['id'] ?? '',
       title: json['title'] ?? '',
       description: json['description'],
-      thumbnailUrl: json['thumbnail_url'],
+      thumbnailUrl: ApiService.mediaUrl(json['thumbnail_url']),
       totalLessons: json['total_lessons'] ?? 0,
       durationMinutes: json['duration_minutes'],
       difficulty: json['difficulty'] ?? 'beginner',

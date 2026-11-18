@@ -404,7 +404,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 radius: 36,
                 backgroundColor: Colors.white.withValues(alpha:0.2),
                 backgroundImage: photoUrl != null && photoUrl.isNotEmpty
-                    ? NetworkImage('https://api.grahvarta.com$photoUrl') as ImageProvider
+                    ? NetworkImage(photoUrl.startsWith('http') ? photoUrl : 'https://api.grahvarta.com$photoUrl') as ImageProvider
                     : null,
                 child: photoUrl == null || photoUrl.isEmpty
                     ? Text(name.isNotEmpty ? name[0].toUpperCase() : 'A', style: const TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.bold))

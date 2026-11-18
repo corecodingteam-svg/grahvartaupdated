@@ -12,6 +12,15 @@ class ApiService {
   static const String socketUrl = 'https://api.grahvarta.com';
   static const _storage = FlutterSecureStorage();
 
+  /// Full URL for a photo/media path from the server. Some records store a
+  /// server-relative path ("/uploads/..."); image loaders need an absolute URL.
+  static String? mediaUrl(dynamic v) {
+    if (v is! String || v.trim().isEmpty) return null;
+    if (v.startsWith('http://') || v.startsWith('https://')) return v;
+    if (v.startsWith('/')) return '$socketUrl$v';
+    return null;
+  }
+
   static Future<String?> getToken() => _storage.read(key: 'auth_token');
   static Future<void> saveToken(String t) => _storage.write(key: 'auth_token', value: t);
   static Future<void> clearToken() => _storage.delete(key: 'auth_token');

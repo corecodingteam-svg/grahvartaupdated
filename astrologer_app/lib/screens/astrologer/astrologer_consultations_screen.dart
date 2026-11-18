@@ -4,6 +4,7 @@ import 'package:shimmer/shimmer.dart';
 import '../../cubits/consultations_cubit.dart';
 import '../../theme/app_theme.dart';
 import 'astrologer_chat_screen.dart';
+import '../../services/api_service.dart';
 import 'astrologer_call_screen.dart';
 
 class AstrologerConsultationsScreen extends StatefulWidget {
@@ -147,7 +148,7 @@ class _AstrologerConsultationsScreenState extends State<AstrologerConsultationsS
     final type = c['type'] ?? 'chat';
     final userName = ((c['user_name'] ?? c['user']?['name'] ?? 'User') as String)
         .split(' ').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '').join(' ');
-    final avatarUrl = c['user_avatar'] ?? c['user']?['avatar_url'];
+    final avatarUrl = ApiService.mediaUrl(c['user_avatar'] ?? c['user']?['avatar_url']);
     final isOnline = c['user_online'] ?? false;
     final durationSec = c['duration_seconds'] ?? 0;
     final amount = double.tryParse(c['total_amount']?.toString() ?? '0') ?? 0;

@@ -252,7 +252,7 @@ function DetailPanel({ app, onClose, onUpdated }) {
           {/* Photo + name */}
           <div className="flex items-center gap-4">
             {app.profile_picture_url ? (
-              <img src={`https://api.grahvarta.com${app.profile_picture_url}`} alt={app.name} className="w-16 h-16 rounded-full object-cover border border-border" />
+              <img src={app.profile_picture_url.startsWith('http') ? app.profile_picture_url : `https://api.grahvarta.com${app.profile_picture_url}`} alt={app.name} className="w-16 h-16 rounded-full object-cover border border-border" />
             ) : (
               <div className="w-16 h-16 rounded-full bg-surface-light flex items-center justify-center text-2xl font-bold text-orange">
                 {app.name?.[0]?.toUpperCase() || '?'}
@@ -506,7 +506,7 @@ export default function HiringsPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     {h.profile_picture_url ? (
-                      <img src={`https://api.grahvarta.com${h.profile_picture_url}`} alt={h.name} className="w-8 h-8 rounded-full object-cover border border-border" />
+                      <img src={h.profile_picture_url.startsWith("http") ? h.profile_picture_url : `https://api.grahvarta.com${h.profile_picture_url}`} alt={h.name} className="w-8 h-8 rounded-full object-cover border border-border" />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-surface-light flex items-center justify-center text-sm font-bold text-orange">
                         {h.name?.[0]?.toUpperCase() || '?'}

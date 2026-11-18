@@ -65,7 +65,7 @@ class AstrologerProfile {
       userId: json['user_id'] ?? '',
       displayName: json['display_name'] ?? json['name'] ?? '',
       bio: json['bio'],
-      avatarUrl: json['avatar_url'],
+      avatarUrl: ApiService.mediaUrl(json['avatar_url']),
       experienceYears: json['experience_years'] ?? 0,
       languages: parseList(json['languages']),
       specializations: parseList(json['specializations']),

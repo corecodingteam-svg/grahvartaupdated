@@ -41,9 +41,13 @@ exports.upload = multer({
   },
 });
 
+// Photos are shown by the apps and the website on other domains, so always
+// hand out (and store) a full URL rather than a server-relative path.
+const absUrl = (p) => (typeof p === 'string' && p.startsWith('/') ? `${process.env.APP_URL || 'https://api.grahvarta.com'}${p}` : p);
+
 exports.uploadPhoto = async (req, res) => {
   if (!req.file) return res.status(400).json({ success: false, message: 'No file received. Ensure field name is "photo" and file is an image.' });
-  res.json({ success: true, data: { url: `/uploads/hirings/${req.file.filename}` } });
+  res.json({ success: true, data: { url: absUrl(`/uploads/hirings/${req.file.filename}`) } });
 };
 
 async function generateTokenNo() {
@@ -303,7 +307,7 @@ exports.activateAsAstrologer = async (req, res) => {
     const userResult = await client.query(
       `INSERT INTO users (email, password_hash, name, avatar_url, role, must_change_password)
        VALUES ($1, $2, $3, $4, 'astrologer', TRUE) RETURNING id`,
-      [app.email, passwordHash, app.name || 'Astrologer', app.profile_picture_url || null]
+      [app.email, passwordHash, app.name || 'Astrologer', absUrl(app.profile_picture_url) || null]
     );
     const userId = userResult.rows[0].id;
 
@@ -319,7 +323,7 @@ exports.activateAsAstrologer = async (req, res) => {
     await client.query(
       `INSERT INTO astrologers (user_id, display_name, bio, avatar_url, languages, specializations, status)
        VALUES ($1, $2, $3, $4, $5, $6, 'approved')`,
-      [userId, app.name, app.about_me || '', app.profile_picture_url || null,
+      [userId, app.name, app.about_me || '', absUrl(app.profile_picture_url) || null,
        langs, skills]
     );
 
@@ -483,11 +487,11 @@ exports.updateProfile = async (req, res) => {
         `UPDATE astrologers SET display_name = $1, bio = $2, languages = $3, specializations = $4,
                 avatar_url = COALESCE($5, avatar_url)
          WHERE user_id = $6`,
-        [row.name, row.about_me || '', asArr(row.languages), asArr(row.skills), row.profile_picture_url || null, row.astrologer_user_id]
+        [row.name, row.about_me || '', asArr(row.languages), asArr(row.skills), absUrl(row.profile_picture_url) || null, row.astrologer_user_id]
       );
       await client.query(
         'UPDATE users SET name = $1, avatar_url = COALESCE($2, avatar_url) WHERE id = $3',
-        [row.name, row.profile_picture_url || null, row.astrologer_user_id]
+        [row.name, absUrl(row.profile_picture_url) || null, row.astrologer_user_id]
       );
       astrologerSynced = true;
     }
