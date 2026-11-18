@@ -22,7 +22,14 @@ class _WeekEarningsCardState extends State<WeekEarningsCard> {
   static const _barLight = Color(0xFFD9661C); // saffron, 3.6:1 on the white card
   static const _barDark = Color(0xFFD96A20);
 
-  static final _rupee = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+  // Whole rupees stay "₹120"; amounts with paise show them ("₹3.20") so the
+  // total always matches the wallet and the recent-consultations list.
+  static final _rupeeWhole = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+  static final _rupeePaise = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
+  static String _money(num n) {
+    final v = n.toDouble();
+    return v == v.roundToDouble() ? _rupeeWhole.format(v) : _rupeePaise.format(v);
+  }
   static final _rupeeExact = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
 
   /// Monday 00:00 of the current week (local time)
@@ -77,8 +84,8 @@ class _WeekEarningsCardState extends State<WeekEarningsCard> {
     final best = total > 0 ? totals.indexOf(totals.reduce((a, b) => a > b ? a : b)) : -1;
 
     return Semantics(
-      label: "This week's earnings ${_rupee.format(total)}. "
-          '${List.generate(7, (i) => '${DateFormat('EEEE').format(start.add(Duration(days: i)))} ${_rupee.format(totals[i])}').join(', ')}',
+      label: "This week's earnings ${_money(total)}. "
+          '${List.generate(7, (i) => '${DateFormat('EEEE').format(start.add(Duration(days: i)))} ${_money(totals[i])}').join(', ')}',
       excludeSemantics: true,
       child: Container(
         width: double.infinity,
@@ -95,7 +102,7 @@ class _WeekEarningsCardState extends State<WeekEarningsCard> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text("This week's earnings", style: TextStyle(color: context.clr.txtSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
-                Text(_rupee.format(total), style: TextStyle(color: context.clr.txtPrimary, fontSize: 28, fontWeight: FontWeight.bold)),
+                Text(_money(total), style: TextStyle(color: context.clr.txtPrimary, fontSize: 28, fontWeight: FontWeight.bold)),
               ]),
             ),
             Text(range, style: TextStyle(color: context.clr.txtMuted, fontSize: 12)),
@@ -104,7 +111,7 @@ class _WeekEarningsCardState extends State<WeekEarningsCard> {
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
-                'Best day: ${DateFormat('EEEE').format(start.add(Duration(days: best)))} · ${_rupee.format(totals[best])}',
+                'Best day: ${DateFormat('EEEE').format(start.add(Duration(days: best)))} · ${_money(totals[best])}',
                 style: TextStyle(color: context.clr.txtMuted, fontSize: 12),
               ),
             ),
@@ -229,3 +236,4 @@ class _WeekEarningsCardState extends State<WeekEarningsCard> {
     );
   }
 }
+

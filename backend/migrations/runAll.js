@@ -38,6 +38,7 @@ const migrations = [
   '031_recharge_offers_dedupe.sql',
   '032_wallet_orders_reconcile.sql',
   '033_agent_messages.sql',
+  '034_backfill_min_charge_earnings.sql',
 ];
 
 // Migrations that existed before the _migrations tracking table was introduced.

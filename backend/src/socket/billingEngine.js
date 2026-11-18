@@ -188,6 +188,12 @@ class BillingEngine {
           );
 
           this.totalCharged = MINIMUM_CHARGE;
+          // Record the split on the consultation too (the per-minute path does the
+          // same) — the dashboard's earnings and charts are summed from it.
+          await this.db.query(
+            `UPDATE consultations SET astrologer_earning = astrologer_earning + $1, platform_fee = platform_fee + $2 WHERE id = $3`,
+            [astrologerEarning, platformFee, this.consultationId]
+          );
           console.log(`Minimum charge ₹${MINIMUM_CHARGE} applied for short consultation ${this.consultationId}`);
         }
       } catch (err) {

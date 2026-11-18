@@ -244,16 +244,22 @@ class _AstrologerDashboardView extends StatelessWidget {
                     final c = recent[i] as Map;
                     final name = ((c['user_name'] ?? 'User') as String).split(' ').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '').join(' ');
                     final type = c['type'] ?? 'chat';
-                    final mins = ((double.tryParse(c['duration_seconds']?.toString() ?? '0') ?? 0) / 60).round();
-                    final amount = double.tryParse(c['total_amount']?.toString() ?? '0') ?? 0;
+                    final secs = (double.tryParse(c['duration_seconds']?.toString() ?? '0') ?? 0).round();
+                    final duration = secs < 60 ? '${secs}s' : '${(secs / 60).round()}m';
+                    // What the astrologer earned (their share) — matches the earnings card and wallet
+                    final amount = double.tryParse(c['astrologer_earning']?.toString() ?? '0') ?? 0;
+                    final status = c['status']?.toString() ?? '';
                     return ListTile(
                       leading: CircleAvatar(
                         backgroundColor: context.clr.accent.withValues(alpha: 0.2),
                         child: Text(name[0].toUpperCase(), style: TextStyle(color: context.clr.accent, fontWeight: FontWeight.bold)),
                       ),
                       title: Text(name, style: TextStyle(color: context.clr.txtPrimary, fontSize: 14)),
-                      subtitle: Text('$type · ${mins}m', style: TextStyle(color: context.clr.txtMuted, fontSize: 12)),
-                      trailing: Text('₹${amount.toStringAsFixed(0)}', style: TextStyle(color: context.clr.success, fontWeight: FontWeight.bold)),
+                      subtitle: Text(status == 'completed' ? '$type · $duration' : '$type · $status', style: TextStyle(color: context.clr.txtMuted, fontSize: 12)),
+                      trailing: Text(
+                        amount == amount.roundToDouble() ? '₹${amount.toStringAsFixed(0)}' : '₹${amount.toStringAsFixed(2)}',
+                        style: TextStyle(color: amount > 0 ? context.clr.success : context.clr.txtMuted, fontWeight: FontWeight.bold),
+                      ),
                     );
                   },
                 ),

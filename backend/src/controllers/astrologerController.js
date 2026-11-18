@@ -327,12 +327,12 @@ exports.getAstrologerDashboard = async (req, res) => {
                 WHERE astrologer_id = $1 AND status = 'completed'`, [astro.id]),
       db.query(`SELECT c.*, u.name as user_name FROM consultations c JOIN users u ON c.user_id = u.id
                 WHERE c.astrologer_id = $1 ORDER BY c.created_at DESC LIMIT 10`, [astro.id]),
-      db.query(`SELECT DATE(c.created_at) as date, SUM(c.astrologer_earning) as daily_earning
+      db.query(`SELECT DATE(c.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata') as date, SUM(c.astrologer_earning) as daily_earning
                 FROM consultations c
                 WHERE c.astrologer_id = $1
                   AND c.status = 'completed'
                   AND c.created_at > NOW() - INTERVAL '30 days'
-                GROUP BY DATE(c.created_at)
+                GROUP BY DATE(c.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')
                 ORDER BY date`, [astro.id]),
     ]);
 
