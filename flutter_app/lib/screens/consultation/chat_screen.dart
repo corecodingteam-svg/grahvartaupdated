@@ -10,6 +10,7 @@ import '../../models/astrologer.dart';
 import '../../services/api_service.dart';
 import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/secure_chat_notice.dart';
 import '../../utils/contact_filter.dart';
 import 'chat_history_screen.dart';
 
@@ -611,6 +612,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildMessages(ChatState state) {
     if (state.messages.isEmpty) {
       return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const SecureChatNotice(),
+        const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(color: context.clr.accent.withValues(alpha: 0.1), shape: BoxShape.circle),
@@ -638,11 +641,12 @@ class _ChatScreenState extends State<ChatScreen> {
     return ListView.builder(
       controller: _scrollCtrl,
       padding: const EdgeInsets.all(16),
-      itemCount: state.messages.length,
-      itemBuilder: (_, i) => _AnimatedBubble(
-        key: ValueKey(state.messages[i].id),
-        child: _buildMessageBubble(state.messages[i]),
-      ),
+      itemCount: state.messages.length + 1,
+      itemBuilder: (_, i) {
+        if (i == 0) return const SecureChatNotice();
+        final m = state.messages[i - 1];
+        return _AnimatedBubble(key: ValueKey(m.id), child: _buildMessageBubble(m));
+      },
     );
   }
 

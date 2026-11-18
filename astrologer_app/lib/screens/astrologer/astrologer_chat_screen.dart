@@ -6,6 +6,7 @@ import 'package:shimmer/shimmer.dart';
 import '../../cubits/chat_cubit.dart';
 import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/secure_chat_notice.dart';
 import '../../utils/block_user.dart';
 import '../../utils/contact_filter.dart';
 
@@ -300,15 +301,22 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
                       : state.loading
                       ? _buildShimmer(context)
                       : state.messages.isEmpty
-                          ? Center(child: Text('No messages yet', style: TextStyle(color: context.clr.txtMuted)))
+                          ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                              const SecureChatNotice(),
+                              Text('No messages yet', style: TextStyle(color: context.clr.txtMuted)),
+                            ]))
                           : ListView.builder(
                               controller: _scroll,
                               padding: const EdgeInsets.all(16),
-                              itemCount: state.messages.length,
-                              itemBuilder: (_, i) => _AnimatedBubble(
-                                key: ValueKey(state.messages[i]['id'] ?? state.messages[i]['created_at'] ?? i),
-                                child: _buildMessage(context, state.messages[i]),
-                              ),
+                              itemCount: state.messages.length + 1,
+                              itemBuilder: (_, i) {
+                                if (i == 0) return const SecureChatNotice();
+                                final m = state.messages[i - 1];
+                                return _AnimatedBubble(
+                                  key: ValueKey(m['id'] ?? m['created_at'] ?? i),
+                                  child: _buildMessage(context, m),
+                                );
+                              },
                             ),
                 ),
                 if (state.isPeerTyping) _buildTypingIndicator(context),
