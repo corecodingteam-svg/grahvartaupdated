@@ -42,6 +42,7 @@ const migrations = [
   '035_chat_e2e.sql',
   '036_astrologer_tools.sql',
   '037_absolute_photo_urls.sql',
+  '038_astrologer_online_sessions.sql',
 ];
 
 // Migrations that existed before the _migrations tracking table was introduced.

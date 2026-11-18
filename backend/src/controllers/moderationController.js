@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { recordPresence } = require('../utils/presenceLog');
 const { sendPushNotification } = require('./liveController');
 
 const HOLD_PRESETS_HOURS = [24, 72, 168, 720];
@@ -145,6 +146,7 @@ exports.hold = async (req, res) => {
     const holdUntil = r.rows[0].hold_until;
     if (subject.astrologer_id) {
       await db.query('UPDATE astrologers SET is_online = FALSE, is_available = FALSE WHERE id = $1', [subject.astrologer_id]);
+      await recordPresence(subject.astrologer_id, false);
       req.io?.emit('astrologer_offline', { astrologer_id: subject.astrologer_id });
     }
     await recordAction(req, subject.id, 'hold', { reason, holdUntil });
@@ -194,6 +196,7 @@ exports.lock = async (req, res) => {
         'UPDATE astrologers SET is_banned = TRUE, ban_reason = $1, is_online = FALSE, is_available = FALSE WHERE id = $2',
         [reason, subject.astrologer_id]
       );
+      await recordPresence(subject.astrologer_id, false);
       req.io?.emit('astrologer_offline', { astrologer_id: subject.astrologer_id });
     }
     await recordAction(req, subject.id, 'lock', { reason });

@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { recordPresence } = require('../utils/presenceLog');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const admin = require('firebase-admin');
@@ -363,6 +364,7 @@ exports.toggleAstrologerOnline = async (req, res) => {
       [id]
     );
     if (!result.rows.length) return res.status(404).json({ success: false, message: 'Astrologer not found' });
+    await recordPresence(id, result.rows[0].is_online);
     res.json({ success: true, data: { is_online: result.rows[0].is_online } });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -378,6 +380,7 @@ exports.banAstrologer = async (req, res) => {
       [reason || null, id]
     );
     if (!result.rows.length) return res.status(404).json({ success: false, message: 'Astrologer not found' });
+    await recordPresence(id, false);
     res.json({ success: true, message: `${result.rows[0].display_name} has been banned` });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });

@@ -112,6 +112,128 @@ class _PerformanceScreenState extends State<PerformanceScreen> {
         ]),
       );
 
+  // ── scorecard ──
+
+  Color _bandColor(String? band) => switch (band) {
+        'excellent' => context.clr.success,
+        'average' => context.clr.accentAlt,
+        'poor' => context.clr.error,
+        _ => context.clr.txtMuted,
+      };
+
+  IconData _bandIcon(String? band) => switch (band) {
+        'excellent' => Icons.sentiment_very_satisfied_rounded,
+        'average' => Icons.sentiment_neutral_rounded,
+        'poor' => Icons.sentiment_dissatisfied_rounded,
+        _ => Icons.remove_rounded,
+      };
+
+  String _bandLabel(String? band) => switch (band) {
+        'excellent' => 'Excellent',
+        'average' => 'Average',
+        'poor' => 'Poor',
+        _ => 'No data',
+      };
+
+  void _showInfo(Map row) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(row['label'] as String),
+        content: Text(row['info'] as String, style: TextStyle(color: ctx.clr.txtSecondary, height: 1.45)),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+      ),
+    );
+  }
+
+  Widget _scorecard(List rows) {
+    final rated = rows.where((r) => r['rating'] != null).toList();
+    final excellent = rated.where((r) => r['rating'] == 'excellent').length;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(color: context.clr.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: context.clr.border)),
+      clipBehavior: Clip.antiAlias,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          child: Row(children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Scorecard', style: TextStyle(color: context.clr.txtPrimary, fontSize: 17, fontWeight: FontWeight.w700)),
+              Text(rated.isEmpty ? 'Scores appear once you have consultations' : '$excellent of ${rated.length} indicators excellent',
+                  style: TextStyle(color: context.clr.txtMuted, fontSize: 12)),
+            ])),
+            Text('Last $_days days', style: TextStyle(color: context.clr.txtMuted, fontSize: 12)),
+          ]),
+        ),
+        Container(
+          color: context.clr.surfaceLight,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(children: [
+            Expanded(child: Text('Indicator', style: TextStyle(color: context.clr.txtSecondary, fontSize: 12, fontWeight: FontWeight.w600))),
+            SizedBox(width: 72, child: Text('Score', textAlign: TextAlign.center, style: TextStyle(color: context.clr.txtSecondary, fontSize: 12, fontWeight: FontWeight.w600))),
+            SizedBox(width: 128, child: Text('Rating', style: TextStyle(color: context.clr.txtSecondary, fontSize: 12, fontWeight: FontWeight.w600))),
+          ]),
+        ),
+        for (var i = 0; i < rows.length; i++) _scoreRow(rows[i] as Map, last: i == rows.length - 1),
+      ]),
+    );
+  }
+
+  Widget _scoreRow(Map r, {bool last = false}) {
+    final band = r['rating'] as String?;
+    final color = _bandColor(band);
+    final value = r['value'];
+    final unit = r['unit'] as String;
+    final shown = value == null ? 'NA' : (value is num && value == value.roundToDouble() ? '${value.toInt()}' : '$value');
+    return InkWell(
+      onTap: () => _showInfo(r),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 6, 10),
+        decoration: BoxDecoration(border: last ? null : Border(bottom: BorderSide(color: context.clr.divider))),
+        child: Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(r['label'] as String, style: TextStyle(color: context.clr.txtPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+            Text(unit == '★' && (r['count'] ?? 0) > 0 ? '${r['count']} reviews' : unit == '★' ? 'stars' : unit,
+                style: TextStyle(color: context.clr.txtMuted, fontSize: 11)),
+          ])),
+          Container(
+            width: 64,
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(8)),
+            child: Text(shown, textAlign: TextAlign.center, style: TextStyle(color: band == null ? context.clr.txtMuted : color, fontWeight: FontWeight.w700, fontSize: 14)),
+          ),
+          SizedBox(
+            width: 92,
+            child: Row(children: [
+              Icon(_bandIcon(band), size: 18, color: color),
+              const SizedBox(width: 4),
+              Flexible(child: Text(_bandLabel(band), overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600))),
+            ]),
+          ),
+          Icon(Icons.info_outline_rounded, size: 18, color: context.clr.txtMuted),
+          const SizedBox(width: 10),
+        ]),
+      ),
+    );
+  }
+
+  Widget _impactNote() => _card(
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(Icons.trending_up_rounded, color: context.clr.accent),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Performance impacts income', style: TextStyle(color: context.clr.txtPrimary, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text(
+              'Users see your rating and whether you are online, and they come back to astrologers who answer quickly. '
+              'Keeping these indicators Excellent brings more consultations and more repeat users. Tap any row to see how it is measured.',
+              style: TextStyle(color: context.clr.txtSecondary, fontSize: 12.5, height: 1.45),
+            ),
+          ])),
+        ]),
+      );
+
   // ── sections ──
 
   Widget _kpis(Map s) {
@@ -405,6 +527,10 @@ class _PerformanceScreenState extends State<PerformanceScreen> {
               )
             else if (d != null) ...[
               if (_loading) LinearProgressIndicator(minHeight: 2, color: context.clr.accent),
+              if (d['scorecard'] is List) ...[
+                _scorecard(d['scorecard'] as List),
+                _impactNote(),
+              ],
               _kpis(d['summary'] as Map),
               const SizedBox(height: 14),
               _outcomes(d['summary'] as Map),

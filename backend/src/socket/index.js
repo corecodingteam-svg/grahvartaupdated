@@ -6,6 +6,7 @@ const { saveMessage, insertSessionDivider } = require('../controllers/threadCont
 const { detectContactInfo, blockedMessageText } = require('../utils/contactFilter');
 const { parseEnvelope, partyKeys } = require('../utils/chatE2e');
 const { recordEnd } = require('../utils/consultationEnd');
+const { recordPresence, closeAllOpen } = require('../utils/presenceLog');
 const transcription = require('../utils/transcription');
 
 const billingEngines = new Map(); // consultationId -> BillingEngine
@@ -34,6 +35,7 @@ function initSocket(io) {
     );
     if (!r.rows.length) return;
     const a = r.rows[0];
+    await recordPresence(a.id, a.is_online);
     const payload = {
       astrologer_id: a.id,
       is_online: a.is_online,
@@ -70,6 +72,7 @@ function initSocket(io) {
   // reconnect re-announce themselves via set_role.
   db.query('UPDATE astrologers SET is_online = FALSE WHERE is_online = TRUE')
     .catch(err => console.error('[presence] reset failed:', err.message));
+  closeAllOpen();
 
   // Lets REST controllers (availability toggle) know whether a socket is live
   io.isAstrologerConnected = isAstrologerConnected;

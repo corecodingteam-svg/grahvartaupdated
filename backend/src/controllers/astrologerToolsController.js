@@ -204,7 +204,7 @@ exports.getPerformance = async (req, res) => {
     const since = `NOW() - INTERVAL '${days} days'`;
     const base = `FROM consultations c WHERE c.astrologer_id = $1 AND c.created_at >= ${since}`;
 
-    const [byType, daily, hours, reasons, messages, firstReply, users, reviews, recent] = await Promise.all([
+    const [byType, daily, hours, reasons, messages, firstReply, users, reviews, recent, ratingsByType, online, live] = await Promise.all([
       db.query(
         `SELECT c.type, ${OUTCOME} AS outcome, COUNT(*)::int AS n,
                 COALESCE(SUM(${DURATION}), 0)::float AS seconds,
@@ -251,6 +251,22 @@ exports.getPerformance = async (req, res) => {
          FROM consultations c LEFT JOIN users u ON u.id = c.user_id
          WHERE c.astrologer_id = $1 AND c.created_at >= ${since}
          ORDER BY c.created_at DESC LIMIT 30`, [id]),
+      db.query(
+        `SELECT CASE WHEN c.type = 'chat' THEN 'chat' ELSE 'call' END AS kind, COUNT(*)::int AS n, AVG(r.rating)::float AS avg
+         FROM astrologer_reviews r JOIN consultations c ON c.id = r.consultation_id
+         WHERE r.astrologer_id = $1 AND r.created_at >= ${since} GROUP BY 1`, [id]),
+      db.query(
+        `SELECT COALESCE(SUM(GREATEST(EXTRACT(EPOCH FROM (LEAST(COALESCE(ended_at, NOW()), NOW()) - GREATEST(started_at, ${since}))), 0)), 0)::float AS seconds,
+                (SELECT MIN(started_at) FROM astrologer_online_sessions WHERE astrologer_id = $1) AS tracked_since,
+                BOOL_OR(ended_at IS NULL) AS online_now
+         FROM astrologer_online_sessions
+         WHERE astrologer_id = $1 AND COALESCE(ended_at, NOW()) >= ${since}`, [id]),
+      db.query(
+        `SELECT COALESCE(SUM(CASE
+                  WHEN NULLIF(duration_seconds, 0) IS NOT NULL THEN duration_seconds
+                  WHEN started_at IS NOT NULL THEN EXTRACT(EPOCH FROM (COALESCE(ended_at, NOW()) - started_at))
+                  ELSE 0 END), 0)::float AS seconds, COUNT(*) FILTER (WHERE started_at IS NOT NULL)::int AS streams
+         FROM live_sessions WHERE astrologer_id = $1 AND COALESCE(started_at, created_at) >= ${since}`, [id]).catch(() => ({ rows: [{ seconds: 0, streams: 0 }] })),
     ]);
 
     // ── Fold rows into totals ──
@@ -304,10 +320,69 @@ exports.getPerformance = async (req, res) => {
     const hourArr = Array.from({ length: 24 }, (_, h) => ({ hour: h, requests: 0, accepted: 0 }));
     for (const r of hours.rows) hourArr[r.hour] = r;
 
+    // ── Scorecard: one score per indicator with an Excellent / Average / Poor band ──
+    const band = (v, excellent, average, higherIsBetter = true) => {
+      if (v == null) return null;
+      if (higherIsBetter) return v >= excellent ? 'excellent' : v >= average ? 'average' : 'poor';
+      return v <= excellent ? 'excellent' : v <= average ? 'average' : 'poor';
+    };
+    const round = (v, d = 1) => (v == null ? null : Math.round(v * 10 ** d) / 10 ** d);
+    const rate = Object.fromEntries(ratingsByType.rows.map((r) => [r.kind, r]));
+    const pickup = (kinds) => {
+      let answered = 0, finished = 0;
+      for (const k of kinds) {
+        const t = types[k];
+        if (!t) continue;
+        answered += t.completed + t.dropped;
+        finished += t.completed + t.dropped + t.declined + t.missed;
+      }
+      return finished ? (answered / finished) * 100 : null;
+    };
+    const firstReplyMedian = firstReply.rows[0]?.n ? firstReply.rows[0].median_seconds : null;
+    const trackedSince = online.rows[0]?.tracked_since ? new Date(online.rows[0].tracked_since) : null;
+    const trackedDays = trackedSince
+      ? Math.min(days, Math.max(1, (Date.now() - Math.max(trackedSince.getTime(), Date.now() - days * 86400e3)) / 86400e3))
+      : null;
+    const onlineHoursPerDay = trackedDays ? online.rows[0].seconds / 3600 / trackedDays : null;
+    const uniqueUsers = users.rows[0]?.unique_users || 0;
+    const chatSessions = types.chat ? types.chat.completed + types.chat.dropped : 0;
+    const callPickup = pickup(['voice', 'video']);
+    const chatPickup = pickup(['chat']);
+    const repeatPct = uniqueUsers ? ((users.rows[0]?.repeat_users || 0) / uniqueUsers) * 100 : null;
+    const avgChatMin = chatSessions ? types.chat.avg_seconds / 60 : null;
+    const liveHours = live.rows[0]?.seconds ? live.rows[0].seconds / 3600 : 0;
+
+    const scorecard = [
+      { key: 'call_rating', label: 'Call rating', unit: '★', value: round(rate.call?.avg), count: rate.call?.n || 0,
+        rating: band(rate.call?.avg ?? null, 4.5, 3.8),
+        info: 'Average stars users gave after voice and video calls. Excellent: 4.5 or more. Average: 3.8 to 4.4.' },
+      { key: 'chat_rating', label: 'Chat rating', unit: '★', value: round(rate.chat?.avg), count: rate.chat?.n || 0,
+        rating: band(rate.chat?.avg ?? null, 4.5, 3.8),
+        info: 'Average stars users gave after chats. Excellent: 4.5 or more. Average: 3.8 to 4.4.' },
+      { key: 'call_pickup', label: 'Call pickup rate', unit: '%', value: round(callPickup), rating: band(callPickup, 95, 80),
+        info: 'Share of voice and video call requests you answered (declined and missed requests count against it). Excellent: 95% or more. Average: 80–94%.' },
+      { key: 'chat_pickup', label: 'Chat pickup rate', unit: '%', value: round(chatPickup), rating: band(chatPickup, 95, 80),
+        info: 'Share of chat requests you answered (declined and missed requests count against it). Excellent: 95% or more. Average: 80–94%.' },
+      { key: 'chat_response', label: 'Chat response time', unit: 'sec', value: round(firstReplyMedian, 0), rating: band(firstReplyMedian, 15, 45, false),
+        info: 'Typical time from a chat starting to your first message (median). Excellent: 15 s or less. Average: 16–45 s. A welcome message counts as your first reply.' },
+      { key: 'chat_length', label: 'Avg chat length', unit: 'min', value: round(avgChatMin), rating: band(avgChatMin, 10, 5),
+        info: 'Average length of your answered chats. Longer chats usually mean users are engaged. Excellent: 10 min or more. Average: 5–9 min.' },
+      { key: 'repeat_users', label: 'Repeat users', unit: '%', value: round(repeatPct), rating: band(repeatPct, 30, 15),
+        info: 'Share of your users who consulted you more than once in this period. Excellent: 30% or more. Average: 15–29%.' },
+      { key: 'drop_rate', label: 'Call drop rate', unit: '%', value: sessions ? round(pct(outcomes.dropped, sessions)) : null,
+        rating: sessions ? band(pct(outcomes.dropped, sessions), 3, 8, false) : null,
+        info: 'Share of answered consultations that ended because a connection dropped. Excellent: 3% or less. Average: 4–8%. A stable internet connection helps.' },
+      { key: 'online_time', label: 'Online time', unit: 'hrs/day', value: round(onlineHoursPerDay), rating: band(onlineHoursPerDay, 8, 4),
+        info: 'Average hours per day you were online and available for requests' + (trackedSince ? '' : ' (tracking starts the next time you go online)') + '. Excellent: 8 h or more. Average: 4–7 h.' },
+      { key: 'live_hours', label: 'Live hours', unit: 'hrs', value: round(liveHours), rating: band(liveHours, 10, 3),
+        info: `Total time you streamed live in this period (${live.rows[0]?.streams || 0} streams). Excellent: 10 h or more. Average: 3–9 h.` },
+    ];
+
     res.json({
       success: true,
       data: {
         days,
+        scorecard,
         summary: {
           requests,
           sessions,
