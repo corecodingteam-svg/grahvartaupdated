@@ -10,10 +10,13 @@ import '../../theme/app_theme.dart';
 Future<void> showAvailabilitySheet(BuildContext context) {
   return showModalBottomSheet(
     context: context,
+    // Size to the content (up to 90% of the screen) and scroll on small phones
+    isScrollControlled: true,
+    constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
     backgroundColor: context.clr.card,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
     builder: (ctx) => SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: ctx.clr.border, borderRadius: BorderRadius.circular(2)))),
