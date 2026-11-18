@@ -169,7 +169,7 @@ class _AstrologerCommunityViewState extends State<_AstrologerCommunityView> {
         return Scaffold(
           appBar: AppBar(
             backgroundColor: context.clr.surface,
-            title: const Text('Community', style: TextStyle(color: Colors.white)),
+            title: Text('Community', style: TextStyle(color: context.clr.txtPrimary)),
             actions: [
               Stack(
                 children: [

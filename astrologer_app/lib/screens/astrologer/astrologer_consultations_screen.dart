@@ -49,7 +49,7 @@ class _AstrologerConsultationsScreenState extends State<AstrologerConsultationsS
           return Scaffold(
             appBar: AppBar(
               backgroundColor: context.clr.surface,
-              title: const Text('Consultations', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              title: Text('Consultations', style: TextStyle(color: context.clr.txtPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
               actions: [
                 IconButton(
                   icon: Icon(Icons.refresh_rounded, color: context.clr.txtPrimary),

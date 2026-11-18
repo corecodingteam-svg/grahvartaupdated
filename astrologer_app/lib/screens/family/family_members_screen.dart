@@ -75,7 +75,7 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: context.clr.surface,
-        title: const Text('Family Members', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text('Family Members', style: TextStyle(color: context.clr.txtPrimary, fontWeight: FontWeight.bold)),
         iconTheme: IconThemeData(color: context.clr.txtPrimary),
         elevation: 0,
       ),

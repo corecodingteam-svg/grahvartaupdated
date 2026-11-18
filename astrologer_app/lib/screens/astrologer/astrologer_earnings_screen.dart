@@ -111,7 +111,7 @@ class _AstrologerEarningsView extends StatelessWidget {
           child: Scaffold(
             appBar: AppBar(
               backgroundColor: context.clr.surface,
-              title: const Text('Earnings & Wallet', style: TextStyle(color: Colors.white)),
+              title: Text('Earnings & Wallet', style: TextStyle(color: context.clr.txtPrimary)),
               bottom: TabBar(
                 indicatorColor: context.clr.accent,
                 labelColor: context.clr.accent,

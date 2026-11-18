@@ -43,7 +43,7 @@ class _AstrologerChatHistoryView extends StatelessWidget {
         final cubit = context.read<ChatHistoryCubit>();
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Chat History', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            title: Text('Chat History', style: TextStyle(color: context.clr.txtPrimary, fontWeight: FontWeight.bold)),
           ),
           body: state.loading
               ? _buildShimmer(context)

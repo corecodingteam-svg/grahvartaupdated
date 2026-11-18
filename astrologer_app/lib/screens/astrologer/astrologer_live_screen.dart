@@ -170,7 +170,7 @@ class _AstrologerLiveView extends StatelessWidget {
         return Scaffold(
           appBar: AppBar(
             backgroundColor: context.clr.surface,
-            title: const Text('Live Sessions', style: TextStyle(color: Colors.white)),
+            title: Text('Live Sessions', style: TextStyle(color: context.clr.txtPrimary)),
           ),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => _showCreateSheet(context, cubit),

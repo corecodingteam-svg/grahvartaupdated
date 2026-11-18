@@ -38,7 +38,7 @@ class _UnlockedReportsScreenState extends State<UnlockedReportsScreen> {
     return Scaffold(
       appBar: widget.embedded ? null : AppBar(
         backgroundColor: context.clr.surface,
-        title: const Text('My Reports', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text('My Reports', style: TextStyle(color: context.clr.txtPrimary, fontWeight: FontWeight.bold)),
         iconTheme: IconThemeData(color: context.clr.txtPrimary),
         elevation: 0,
       ),
