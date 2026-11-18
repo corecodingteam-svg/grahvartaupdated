@@ -93,7 +93,8 @@ class ProfileScreen extends StatelessWidget {
       ),
       trailing: Switch(
         value: isDark,
-        activeThumbColor: accentColor,
+        activeThumbColor: Colors.white,
+        activeTrackColor: accentColor,
         onChanged: (_) => context.read<ThemeProvider>().toggle(),
       ),
     );

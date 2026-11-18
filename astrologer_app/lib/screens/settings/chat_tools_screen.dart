@@ -120,7 +120,7 @@ class _ChatToolsScreenState extends State<ChatToolsScreen> {
                             Icon(Icons.waving_hand_outlined, color: context.clr.accent),
                             const SizedBox(width: 10),
                             Expanded(child: Text('Welcome message', style: TextStyle(color: context.clr.txtPrimary, fontSize: 16, fontWeight: FontWeight.w600))),
-                            Switch(value: _enabled, activeThumbColor: context.clr.accent, onChanged: (v) => setState(() => _enabled = v)),
+                            Switch(value: _enabled, activeThumbColor: Colors.white, activeTrackColor: context.clr.accent, onChanged: (v) => setState(() => _enabled = v)),
                           ]),
                           Text('Sent to the user automatically as soon as a chat starts.',
                               style: TextStyle(color: context.clr.txtMuted, fontSize: 12)),

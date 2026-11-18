@@ -85,7 +85,8 @@ class _SoundSettingsScreenState extends State<SoundSettingsScreen> {
           contentPadding: const EdgeInsets.only(left: 4, right: 4),
           title: Text('Vibrate', style: TextStyle(color: context.clr.txtPrimary, fontSize: 14)),
           value: p.vibrate,
-          activeThumbColor: context.clr.accent,
+          activeThumbColor: Colors.white,
+          activeTrackColor: context.clr.accent,
           onChanged: (v) {
             _set(c, p.copyWith(vibrate: v));
             if (v) _svc.preview('silent', vibrate: true);

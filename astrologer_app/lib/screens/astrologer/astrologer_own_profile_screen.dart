@@ -452,7 +452,8 @@ class _AstrologerOwnProfileViewState extends State<_AstrologerOwnProfileView> {
           Switch(
             value: themeProvider.isDark,
             onChanged: (_) => themeProvider.toggle(),
-            activeThumbColor: context.clr.accent,
+            activeThumbColor: Colors.white,
+            activeTrackColor: context.clr.accent,
           ),
         ]),
       ]),
