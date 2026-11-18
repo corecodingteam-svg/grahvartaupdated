@@ -279,6 +279,7 @@ class _AstrologerOwnProfileViewState extends State<_AstrologerOwnProfileView> {
 
   Widget _infoCard(BuildContext context, String title, String content) {
     return Container(
+      width: double.infinity, // full width of the page, like the other profile cards
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: context.clr.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: context.clr.border)),
@@ -316,6 +317,7 @@ class _AstrologerOwnProfileViewState extends State<_AstrologerOwnProfileView> {
 
   Widget _ratesCard(BuildContext context, AstrologerProfile profile) {
     return Container(
+      width: double.infinity, // full width of the page, like the other profile cards
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: context.clr.card, borderRadius: BorderRadius.circular(16), border: Border.all(color: context.clr.border)),
