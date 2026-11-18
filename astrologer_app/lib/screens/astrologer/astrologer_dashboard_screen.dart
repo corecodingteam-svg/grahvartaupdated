@@ -6,7 +6,6 @@ import '../../cubits/dashboard_cubit.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import 'astrologer_own_profile_screen.dart';
-import 'astrologer_earnings_screen.dart';
 import '../../services/socket_service.dart';
 import 'availability_sheet.dart';
 import 'week_earnings_card.dart';
@@ -96,11 +95,7 @@ class _AstrologerDashboardView extends StatelessWidget {
                     },
                   ),
                 ),
-              IconButton(
-                icon: Icon(Icons.account_balance_wallet_outlined, color: context.clr.txtPrimary),
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AstrologerEarningsScreen())),
-                tooltip: 'Wallet',
-              ),
+              const SizedBox(width: 12),
             ],
           ),
           body: state.loading
