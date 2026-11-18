@@ -114,7 +114,7 @@ class _MainScreenState extends State<MainScreen> {
             children: [
               _navItem(icon: Icons.home_rounded, index: 0, label: 'Home'),
               _navItem(icon: Icons.people_rounded, index: 1, label: 'Astrologers'),
-              _navItem(icon: Icons.auto_awesome, index: 2, label: 'Reports'),
+              _navItem(icon: Icons.article_rounded, index: 2, label: 'Reports'),
               _navItem(icon: Icons.live_tv_rounded, index: 3, label: 'Live', badge: '2'),
               _navItem(icon: Icons.auto_awesome, index: 4, label: 'Kundli'),
             ],
