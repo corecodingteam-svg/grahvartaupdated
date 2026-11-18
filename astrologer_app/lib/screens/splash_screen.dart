@@ -167,7 +167,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                     child: Transform.scale(
                       scale: _mandalaScale.value,
                       child: Image.asset(
-                        'assets/images/logo.png',
+                        // transparent version — logo.png keeps its solid background for the app icon
+                        'assets/images/logo_transparent.png',
                         width: 150,
                         height: 150,
                         fit: BoxFit.contain,
