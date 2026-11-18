@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/secure_chat_notice.dart';
 
 class ThreadScreen extends StatefulWidget {
   final String astrologerId;
@@ -175,6 +176,8 @@ class _ThreadScreenState extends State<ThreadScreen> {
     if (_messages.isEmpty) {
       return Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SecureChatNotice(),
+          const SizedBox(height: 12),
           Icon(Icons.chat_bubble_outline_rounded, color: context.clr.txtMuted, size: 48),
           const SizedBox(height: 12),
           Text('No messages yet with ${widget.astrologerName}', style: TextStyle(color: context.clr.txtMuted, fontSize: 13)),
@@ -197,6 +200,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (i == 0) const SecureChatNotice(),
             if (showDate) _buildDateHeader(_dateHeader(msg['created_at'])),
             _buildBubble(msg),
           ],

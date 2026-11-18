@@ -24,7 +24,7 @@ class SecureChatNotice extends StatelessWidget {
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                'Your chats are secure and encrypted. Only you and your astrologer can see them.',
+                'Your chats are secure and encrypted. Your conversation stays private.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: context.clr.txtSecondary, fontSize: 11.5, height: 1.35),
               ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/secure_chat_notice.dart';
 import '../../utils/block_user.dart';
 import 'consultation_transcript_screen.dart';
 
@@ -215,6 +216,8 @@ class _AstrologerUserThreadScreenState extends State<AstrologerUserThreadScreen>
   Widget _buildMessageList() {
     if (_messages.isEmpty) {
       return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const SecureChatNotice(),
+        const SizedBox(height: 12),
         Icon(Icons.chat_bubble_outline_rounded, color: context.clr.txtMuted, size: 48),
         const SizedBox(height: 12),
         Text('No messages yet with ${widget.userName}', style: TextStyle(color: context.clr.txtMuted, fontSize: 13)),
@@ -230,6 +233,7 @@ class _AstrologerUserThreadScreenState extends State<AstrologerUserThreadScreen>
         final prev = i > 0 ? _messages[i - 1] : null;
         final showDate = prev == null || _dateHeader(msg['created_at']) != _dateHeader(prev['created_at']);
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (i == 0) const SecureChatNotice(),
           if (showDate) _buildDateHeader(_dateHeader(msg['created_at'])),
           _buildBubble(msg),
         ]);
