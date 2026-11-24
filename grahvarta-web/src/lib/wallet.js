@@ -4,6 +4,10 @@
 // against the order id when verifying (backend/src/controllers/walletController.js
 // createAddMoneyOrder/verifyAndCredit).
 import { api } from './api'
+import { track } from './analytics'
+
+// order id → amount, so the purchase event can carry its value
+const pendingOrders = new Map()
 
 export async function fetchWallet() {
   const res = await api.get('/api/wallet', { auth: true })
@@ -19,6 +23,8 @@ export async function fetchTransactions({ page = 1, limit = 20, type } = {}) {
 
 export async function createAddMoneyOrder(amount) {
   const res = await api.post('/api/wallet/add-money/order', { amount }, { auth: true })
+  if (res.data?.order_id) pendingOrders.set(res.data.order_id, Number(amount))
+  track('begin_checkout', { currency: 'INR', value: Number(amount) })
   return res.data
 }
 
@@ -28,6 +34,14 @@ export async function verifyAddMoney({ orderId, paymentId, signature }) {
     { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature },
     { auth: true }
   )
+  const value = pendingOrders.get(orderId)
+  pendingOrders.delete(orderId)
+  track('purchase', {
+    currency: 'INR',
+    value,
+    transaction_id: orderId,
+    items: [{ item_name: 'wallet_recharge', item_category: 'wallet', price: value, quantity: 1 }],
+  })
   return res.data
 }
 

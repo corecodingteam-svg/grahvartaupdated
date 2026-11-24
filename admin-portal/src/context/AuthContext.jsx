@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
+import { track, identify, clearIdentity } from '../lib/analytics';
 
 const AuthContext = createContext(null);
 
@@ -16,11 +17,16 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
+  useEffect(() => {
+    if (admin?.id) identify(admin.id, admin.role || 'admin');
+  }, [admin?.id, admin?.role]);
+
   const login = async (email, password) => {
     const { data } = await api.post('/login', { email, password });
     localStorage.setItem('admin_token', data.data.token);
     localStorage.setItem('admin_user', JSON.stringify(data.data.admin));
     setAdmin(data.data.admin);
+    track('login', { method: 'email' });
   };
 
   const hasPermission = (key) => {
@@ -30,6 +36,8 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    track('logout');
+    clearIdentity();
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_user');
     setAdmin(null);

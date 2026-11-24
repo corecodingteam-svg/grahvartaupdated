@@ -3,6 +3,7 @@ import { io } from 'socket.io-client'
 import { SOCKET_URL, getToken } from '../lib/api'
 import { decodeMessage, fetchPeerKey, isChatReady, seal, chatKeyStatus, uploadEncryptedImage } from '../lib/chatCrypto'
 import { detectContactInfo, blockedMessageText } from '../lib/contactFilter'
+import { track } from '../lib/analytics'
 
 // Drives the socket.io consultation lifecycle exactly as the Flutter app
 // does (backend/src/socket/index.js) — request_consultation creates the
@@ -58,6 +59,7 @@ export function useConsultation({ astrologerId, type, enabled = true }) {
     socket.on('connect', () => {
       socket.emit('set_role', { role: 'user' })
       socket.emit('request_consultation', { astrologer_id: astrologerId, type })
+      track('request_consultation', { astrologer_id: astrologerId, consultation_type: type })
     })
 
     socket.on('consultation_queued', (data) => {
@@ -179,6 +181,7 @@ export function useConsultation({ astrologerId, type, enabled = true }) {
   const endConsultation = useCallback(() => {
     if (!socketRef.current || !consultationIdRef.current) return
     socketRef.current.emit('end_consultation', { consultation_id: consultationIdRef.current })
+    track('end_consultation', { consultation_id: consultationIdRef.current, ended_by: 'user' })
   }, [])
 
   return {

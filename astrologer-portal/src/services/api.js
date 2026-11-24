@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { configureChatCrypto, clearChatKey } from '../lib/chatCrypto'
+import { track } from '../lib/analytics'
 
 const BASE_URL = (import.meta.env.VITE_API_URL || 'https://api.grahvarta.com') + '/api'
 
@@ -44,7 +45,10 @@ export const authAPI = {
 export const astrologerAPI = {
   register: (data) => api.post('/astrologers/register', data),
   getDashboard: () => api.get('/astrologers/me/dashboard'),
-  updateAvailability: (is_available) => api.patch('/astrologers/availability', { is_available }),
+  updateAvailability: (is_available) => api.patch('/astrologers/availability', { is_available }).then((r) => {
+    track(is_available ? 'astrologer_go_online' : 'astrologer_go_offline')
+    return r
+  }),
   getConsultationHistory: () => api.get('/astrologers/consultations/history'),
   getConsultationMessages: (id) => api.get(`/astrologers/consultations/${id}/messages`),
 }

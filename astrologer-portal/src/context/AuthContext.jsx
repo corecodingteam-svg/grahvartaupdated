@@ -2,6 +2,7 @@ import { clearChatKey } from '../lib/chatCrypto'
 import { createContext, useContext, useState, useEffect } from 'react'
 import { authAPI, astrologerAPI } from '../services/api'
 import { connectSocket, disconnectSocket } from '../services/socket'
+import { track, identify, clearIdentity } from '../lib/analytics'
 
 const AuthContext = createContext(null)
 
@@ -22,6 +23,10 @@ export function AuthProvider({ children }) {
       setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    if (user?.id) identify(user.id, astrologer ? 'astrologer' : 'user')
+  }, [user?.id, astrologer])
 
   async function fetchProfile() {
     try {
@@ -51,6 +56,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('user', JSON.stringify(userData))
     setUser(userData)
     connectSocket(token)
+    track('login', { method: 'email' })
 
     try {
       const dash = await astrologerAPI.getDashboard()
@@ -69,10 +75,13 @@ export function AuthProvider({ children }) {
     localStorage.setItem('user', JSON.stringify(userData))
     setUser(userData)
     connectSocket(token)
+    track('sign_up', { method: 'email' })
     return userData
   }
 
   function logout() {
+    if (localStorage.getItem('token')) track('logout')
+    clearIdentity()
     clearChatKey()
     localStorage.removeItem('token')
     localStorage.removeItem('user')

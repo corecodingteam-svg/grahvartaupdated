@@ -9,7 +9,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'https://api.grahvarta.com',
+      // Override for local testing: ADMIN_API_PROXY=http://localhost:3300 npm run dev
+      '/api': process.env.ADMIN_API_PROXY || 'https://api.grahvarta.com',
     },
   },
 });

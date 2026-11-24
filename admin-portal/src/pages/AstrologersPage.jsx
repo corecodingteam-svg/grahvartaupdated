@@ -186,6 +186,7 @@ export default function AstrologersPage() {
 
   const reject = async (id) => {
     const reason = prompt('Rejection reason (optional):');
+    if (reason === null) return; // Cancel must not reject
     try { await api.post(`/astrologers/${id}/reject`, { reason }); toast.success('Rejected'); fetchAstrologers(); }
     catch { toast.error('Failed'); }
   };

@@ -41,6 +41,9 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-https://api.grahvarta.com}
         VITE_SOCKET_URL: ${VITE_SOCKET_URL:-https://api.grahvarta.com}
+        VITE_FIREBASE_API_KEY: ${FIREBASE_WEB_API_KEY:-}
+        VITE_FIREBASE_APP_ID: ${WEB_FIREBASE_APP_ID:-}
+        VITE_FIREBASE_MEASUREMENT_ID: ${WEB_FIREBASE_MEASUREMENT_ID:-}
     restart: unless-stopped
 
   # ── GrahVarta Web API (Gemini-backed proxy: kundli, panchang, tarot, …) ───
@@ -58,6 +61,9 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-https://api.grahvarta.com}
+        VITE_FIREBASE_API_KEY: ${FIREBASE_WEB_API_KEY:-}
+        VITE_FIREBASE_APP_ID: ${ASTRO_PORTAL_FIREBASE_APP_ID:-}
+        VITE_FIREBASE_MEASUREMENT_ID: ${ASTRO_PORTAL_FIREBASE_MEASUREMENT_ID:-}
     restart: unless-stopped
 
   # ── Admin Portal ──────────────────────────────────────────────────────────
@@ -65,6 +71,10 @@ services:
     build:
       context: ./admin-portal
       dockerfile: Dockerfile
+      args:
+        VITE_FIREBASE_API_KEY: ${FIREBASE_WEB_API_KEY:-}
+        VITE_FIREBASE_APP_ID: ${ADMIN_FIREBASE_APP_ID:-}
+        VITE_FIREBASE_MEASUREMENT_ID: ${ADMIN_FIREBASE_MEASUREMENT_ID:-}
     restart: unless-stopped
 
   # ── Nginx Reverse Proxy ───────────────────────────────────────────────────

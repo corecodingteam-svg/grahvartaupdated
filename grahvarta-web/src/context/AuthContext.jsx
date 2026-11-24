@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { api, getToken, setToken, clearToken } from '../lib/api'
+import { track, identify, clearIdentity } from '../lib/analytics'
 
 // Mirrors flutter_app's AuthProvider (lib/providers/auth_provider.dart) 1:1 —
 // same backend, same token, same user shape — so a Flutter-app user can log
@@ -34,10 +35,15 @@ export function AuthProvider({ children }) {
     tryAutoLogin()
   }, [tryAutoLogin])
 
+  useEffect(() => {
+    if (user?.id) identify(user.id, 'user')
+  }, [user?.id])
+
   async function login(email, password) {
     const res = await api.post('/api/auth/login', { email, password, login_as: 'user' })
     setToken(res.data.token)
     setUser(res.data.user)
+    track('login', { method: 'email' })
     return res.data.user
   }
 
@@ -52,10 +58,13 @@ export function AuthProvider({ children }) {
     })
     setToken(res.data.token)
     setUser(res.data.user)
+    track('sign_up', { method: 'email' })
     return res.data.user
   }
 
   function logout() {
+    track('logout')
+    clearIdentity()
     clearToken()
     setUser(null)
   }

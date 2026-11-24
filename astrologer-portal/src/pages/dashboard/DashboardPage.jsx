@@ -8,6 +8,7 @@ import { getSocket } from '../../services/socket'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import CallScreen from '../call/CallScreen'
+import { track } from '../../lib/analytics'
 
 const TYPE_ICON = { chat: MessageSquare, voice: Phone, video: Video }
 
@@ -59,6 +60,7 @@ export default function DashboardPage() {
     const socket = getSocket()
     if (!socket || !incomingRequest) return
     socket.emit('accept_consultation', { consultation_id: incomingRequest.consultation_id })
+    track('accept_consultation', { consultation_id: incomingRequest.consultation_id })
     toast.success(`Consultation accepted with ${incomingRequest.user?.name}`)
     const req = incomingRequest
     setIncomingRequest(null)
@@ -78,6 +80,7 @@ export default function DashboardPage() {
     const socket = getSocket()
     if (!socket || !incomingRequest) return
     socket.emit('reject_consultation', { consultation_id: incomingRequest.consultation_id })
+    track('reject_consultation', { consultation_id: incomingRequest.consultation_id })
     setIncomingRequest(null)
     toast('Request declined')
   }

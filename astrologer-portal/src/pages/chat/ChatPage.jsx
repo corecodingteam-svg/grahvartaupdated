@@ -8,6 +8,7 @@ import { useChatUnlock } from '../../lib/useChatUnlock'
 import EncryptedImage from '../../lib/EncryptedImage'
 import { decodeMessage, fetchPeerKey, isChatReady, seal, chatKeyStatus, uploadEncryptedImage } from '../../lib/chatCrypto'
 import { detectContactInfo, blockedMessageText } from '../../lib/contactFilter'
+import { track } from '../../lib/analytics'
 
 export default function ChatPage() {
   const [consultations, setConsultations] = useState([])
@@ -100,6 +101,7 @@ export default function ChatPage() {
     // Chats are end-to-end encrypted: unlock the key before accepting so the user isn't billed meanwhile
     if (incomingRequest.type === 'chat' && !(await ensure())) return
     socket.emit('accept_consultation', { consultation_id: incomingRequest.consultation_id })
+    track('accept_consultation', { consultation_id: incomingRequest.consultation_id })
     const newConsultation = {
       id: incomingRequest.consultation_id,
       user_name: incomingRequest.user?.name,
@@ -164,6 +166,7 @@ export default function ChatPage() {
     const socket = getSocket()
     if (!socket || !incomingRequest) return
     socket.emit('reject_consultation', { consultation_id: incomingRequest.consultation_id })
+    track('reject_consultation', { consultation_id: incomingRequest.consultation_id })
     setIncomingRequest(null)
   }
 

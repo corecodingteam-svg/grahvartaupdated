@@ -4,6 +4,10 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
+# Firebase Analytics web config (public values; analytics is off when empty)
+ARG VITE_FIREBASE_API_KEY=
+ARG VITE_FIREBASE_APP_ID=
+ARG VITE_FIREBASE_MEASUREMENT_ID=
 RUN npm run build
 
 # Stage 2 — serve with nginx
