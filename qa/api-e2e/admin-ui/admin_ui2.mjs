@@ -1,0 +1,20 @@
+import { chromium } from 'playwright';
+import * as L from '../lib.mjs';
+const BASE = 'http://localhost:5174/admin';
+const u = await L.registerUser();
+const reg = await L.post('/astrologers/register', { display_name: 'Cancel Test ' + L.uniq(), bio: 'bio', languages: ['Hindi'] }, { token: u.token });
+const id = reg.body.data.id;
+const browser = await chromium.launch(); const page = await (await browser.newContext()).newPage();
+await page.goto(`${BASE}/login`);
+await page.fill('input[type=email]', 'qa-admin@local.test'); await page.fill('input[type=password]', 'LocalQaAdmin#2026'); await page.click('button[type=submit]');
+await page.waitForURL((x) => !x.pathname.endsWith('/login'));
+await page.goto(`${BASE}/astrologers`); await page.waitForTimeout(1500);
+const row = page.locator('tr', { hasText: reg.body.data.display_name });
+let prompted = '';
+page.once('dialog', (d) => { prompted = d.message(); d.dismiss(); }); // press Cancel on the reason prompt
+await row.locator('button[title="Reject"], button:has(svg.lucide-x), button:has(svg.lucide-circle-x), button:has(svg.lucide-x-circle)').first().click();
+await page.waitForTimeout(1500);
+const st = L.sql(`SELECT status FROM astrologers WHERE id='${id}'`);
+L.record('AD-AST-10', prompted && st === 'pending' ? 'Pass' : 'Fail', `reject → prompt "${prompted}" shown; pressed Cancel → astrologer status ${st}`, 'Fixed: Cancel used to reject the astrologer anyway');
+L.results['AD-AST-10'].how = 'Playwright (Chromium) against local admin dev server';
+await browser.close(); L.save(); process.exit(0);
