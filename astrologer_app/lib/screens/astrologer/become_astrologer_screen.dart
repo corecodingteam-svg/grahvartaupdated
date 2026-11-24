@@ -74,7 +74,7 @@ class BecomeAstrologerScreen extends StatelessWidget {
   static const _benefits = [
     ('₹ Earn Per Minute', 'Set your own rates for chat, call, and video consultations', Icons.monetization_on_outlined),
     ('🌟 Build Your Brand', 'Grow your reputation with ratings and reviews', Icons.star_border),
-    ('📱 Mobile Dashboard', 'Manage everything from your phone — accept/reject, go live, withdraw', Icons.phone_android),
+    ('📱 Mobile Dashboard', 'Manage everything from your phone — accept/reject, go live, track earnings', Icons.phone_android),
     ('🔴 Live Sessions', 'Host live astrology sessions and earn tips from viewers', Icons.live_tv_outlined),
   ];
 

@@ -45,9 +45,9 @@ const _pages = [
   _OnboardingData(
     icon: '💰',
     title: 'Grow Your\nAstrology Career',
-    subtitle: 'Build your reputation, go live to reach thousands, earn per minute, and withdraw your earnings anytime.',
+    subtitle: 'Build your reputation, go live to reach thousands, earn per minute, and track your earnings in one place.',
     symbols: ['🌕', '🌗', '🌑', '🌓', '☿', '♀', '♂', '♃', '♄', '⛎', '☽', '☿'],
-    pills: ['Earn Per Minute', 'Go Live', 'Instant Withdrawal'],
+    pills: ['Earn Per Minute', 'Go Live', 'Track Earnings'],
   ),
 ];
 

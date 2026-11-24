@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'api_service.dart';
+import 'analytics_service.dart';
 
 class SocketService {
   static SocketService? _instance;
@@ -147,13 +148,18 @@ class SocketService {
   // ── Consultation ──────────────────────────────────────────────
   void requestConsultation(String astrologerId, String type) {
     emit('request_consultation', {'astrologer_id': astrologerId, 'type': type});
+    AnalyticsService.instance.log('request_consultation', {'astrologer_id': astrologerId, 'consultation_type': type});
   }
 
   /// Cancel a request whose id isn't known yet (user left before it was confirmed).
-  void cancelRequest(String astrologerId) => emit('cancel_request', {'astrologer_id': astrologerId});
+  void cancelRequest(String astrologerId) {
+    emit('cancel_request', {'astrologer_id': astrologerId});
+    AnalyticsService.instance.log('cancel_consultation_request', {'astrologer_id': astrologerId});
+  }
 
   void endConsultation(String consultationId) {
     emit('end_consultation', {'consultation_id': consultationId});
+    AnalyticsService.instance.log('end_consultation', {'consultation_id': consultationId, 'ended_by': 'user'});
   }
 
   void sendMessage(String consultationId, String content, {String type = 'text'}) {
@@ -177,15 +183,30 @@ class SocketService {
   }
 
   // ── Live ──────────────────────────────────────────────────────
-  void joinLive(String sessionId) => emit('join_live', {'session_id': sessionId});
+  void joinLive(String sessionId) {
+    emit('join_live', {'session_id': sessionId});
+    AnalyticsService.instance.log('join_live', {'session_id': sessionId});
+  }
   void leaveLive(String sessionId) => emit('leave_live', {'session_id': sessionId});
   void sendLiveChat(String sessionId, String message) => emit('live_chat', {'session_id': sessionId, 'message': message});
-  void sendTip(String sessionId, double amount, String message) => emit('send_tip', {'session_id': sessionId, 'amount': amount, 'message': message});
+  void sendTip(String sessionId, double amount, String message) {
+    emit('send_tip', {'session_id': sessionId, 'amount': amount, 'message': message});
+    AnalyticsService.instance.log('send_tip', {'session_id': sessionId, 'value': amount, 'currency': 'INR'});
+  }
 
   void joinConsultation(String consultationId) => emit('join_consultation', {'consultation_id': consultationId});
 
   // ── Astrologer ────────────────────────────────────────────────
-  void acceptConsultation(String consultationId) => emit('accept_consultation', {'consultation_id': consultationId});
-  void rejectConsultation(String consultationId) => emit('reject_consultation', {'consultation_id': consultationId});
-  void astrologerEndConsultation(String consultationId) => emit('end_consultation', {'consultation_id': consultationId});
+  void acceptConsultation(String consultationId) {
+    emit('accept_consultation', {'consultation_id': consultationId});
+    AnalyticsService.instance.log('accept_consultation', {'consultation_id': consultationId});
+  }
+  void rejectConsultation(String consultationId) {
+    emit('reject_consultation', {'consultation_id': consultationId});
+    AnalyticsService.instance.log('reject_consultation', {'consultation_id': consultationId});
+  }
+  void astrologerEndConsultation(String consultationId) {
+    emit('end_consultation', {'consultation_id': consultationId});
+    AnalyticsService.instance.log('end_consultation', {'consultation_id': consultationId, 'ended_by': 'astrologer'});
+  }
 }

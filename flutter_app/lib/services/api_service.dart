@@ -2,14 +2,18 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'analytics_service.dart';
 import '../models/user.dart';
 import '../models/astrologer.dart';
 import '../models/family_member.dart';
 import '../models/report.dart';
 
 class ApiService {
-  static const String baseUrl = 'https://api.grahvarta.com/api';
-  static const String socketUrl = 'https://api.grahvarta.com';
+  /// Backend host. Production by default; point a test build elsewhere with
+  /// `--dart-define=API_HOST=http://127.0.0.1:3300`.
+  static const String apiHost = String.fromEnvironment('API_HOST', defaultValue: 'https://api.grahvarta.com');
+  static const String baseUrl = '$apiHost/api';
+  static const String socketUrl = apiHost;
   static const _storage = FlutterSecureStorage();
 
   /// Full URL for a photo/media path from the server. Some records store a
@@ -209,12 +213,16 @@ class ApiService {
 
   static Future<Map<String, dynamic>> createAddMoneyOrder(double amount) async {
     final r = await http.post(Uri.parse('$baseUrl/wallet/add-money/order'), headers: await _headers(auth: true), body: jsonEncode({'amount': amount}));
-    return _handle(r);
+    final res = await _handle(r);
+    AnalyticsService.instance.logBeginCheckout(amount: amount, orderId: res['data']?['order_id']?.toString());
+    return res;
   }
 
   static Future<WalletData> verifyAndCredit(Map<String, dynamic> payload) async {
     final r = await http.post(Uri.parse('$baseUrl/wallet/add-money/verify'), headers: await _headers(auth: true), body: jsonEncode(payload));
-    return WalletData.fromJson((await _handle(r))['data']);
+    final wallet = WalletData.fromJson((await _handle(r))['data']);
+    AnalyticsService.instance.logPurchase(orderId: payload['order_id']?.toString());
+    return wallet;
   }
 
   /// Ask the server to check this user's pending top-ups with Razorpay and
@@ -239,6 +247,7 @@ class ApiService {
   static Future<void> purchaseSubscription(String planId) async {
     final r = await http.post(Uri.parse('$baseUrl/wallet/subscribe'), headers: await _headers(auth: true), body: jsonEncode({'plan_id': planId}));
     await _handle(r);
+    AnalyticsService.instance.log('purchase_subscription', {'plan_id': planId});
   }
 
   // ── Agora ─────────────────────────────────────────────────────
@@ -309,7 +318,9 @@ class ApiService {
   static Future<Map<String, dynamic>> unlockReport(String reportId, {String? familyMemberId, String language = 'English'}) async {
     final r = await http.post(Uri.parse('$baseUrl/reports/unlock'), headers: await _headers(auth: true),
         body: jsonEncode({'report_id': reportId, if (familyMemberId != null) 'family_member_id': familyMemberId, 'language': language}));
-    return _handle(r);
+    final res = await _handle(r);
+    AnalyticsService.instance.log('unlock_report', {'report_id': reportId, 'language': language, 'for_family_member': familyMemberId != null ? 'yes' : 'no'});
+    return res;
   }
 
   static Future<ReportUnlock> getReportDetail(String unlockId) async {
@@ -336,7 +347,9 @@ class ApiService {
   static Future<Map<String, dynamic>> purchaseReportPlan(String planName) async {
     final r = await http.post(Uri.parse('$baseUrl/reports/plans/purchase'), headers: await _headers(auth: true),
         body: jsonEncode({'plan_name': planName}));
-    return _handle(r);
+    final res = await _handle(r);
+    AnalyticsService.instance.log('purchase_report_plan', {'plan_name': planName});
+    return res;
   }
 
   // ── Astrologer Self (dashboard, register, availability) ──────

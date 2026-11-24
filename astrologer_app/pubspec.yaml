@@ -70,6 +70,8 @@ dependencies:
   pinenacl: ^0.6.0
   cryptography: ^2.7.0
   vibration: ^3.2.1
+  firebase_analytics: ^12.6.1
+  package_info_plus: ^10.2.2
 
 
 dev_dependencies:

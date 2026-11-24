@@ -10,6 +10,7 @@ import 'providers/locale_provider.dart';
 import 'providers/theme_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
+import 'services/analytics_service.dart';
 
 final FlutterLocalNotificationsPlugin localNotifs = FlutterLocalNotificationsPlugin();
 
@@ -87,7 +88,8 @@ void main() async {
 
   // Firebase init is crash-guarded — user works without it (push notifications just won't fire)
   try {
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(options: firebaseWebOptions);
+    await AnalyticsService.instance.init(app: 'user');
     FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
     await _initLocalNotifications();
 
@@ -152,6 +154,7 @@ class _AstroTalkAppState extends State<AstroTalkApp> {
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.isDark ? ThemeMode.dark : ThemeMode.light,
           navigatorKey: navigatorKey,
+          navigatorObservers: [AnalyticsService.instance.observer],
           locale: localeProvider.locale,
           supportedLocales: const [
             Locale('en'), Locale('hi'), Locale('ta'),

@@ -383,7 +383,7 @@ class _AstrologerOwnProfileViewState extends State<_AstrologerOwnProfileView> {
           const SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Earnings & Wallet', style: TextStyle(color: context.clr.txtPrimary, fontSize: 15, fontWeight: FontWeight.w600)),
-            Text('View transactions & request withdrawal', style: TextStyle(color: context.clr.txtMuted, fontSize: 12)),
+            Text('View earnings & transactions', style: TextStyle(color: context.clr.txtMuted, fontSize: 12)),
           ])),
           Icon(Icons.chevron_right_rounded, color: context.clr.txtMuted),
         ]),

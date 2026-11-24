@@ -71,12 +71,16 @@ dependencies:
   share_plus: ^13.3.1
   pinenacl: ^0.6.0
   cryptography: ^2.7.0
+  firebase_analytics: ^12.6.1
+  package_info_plus: ^10.2.2
 
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  integration_test:
+    sdk: flutter
 
 flutter:
   uses-material-design: true

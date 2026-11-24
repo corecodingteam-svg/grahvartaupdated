@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_strings.dart';
 import '../../providers/auth_provider.dart';
@@ -40,9 +42,9 @@ class _InviteCard extends StatelessWidget {
               const SizedBox(width: 14),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Invite friends to Grahvarta', style: TextStyle(color: context.clr.txtPrimary, fontWeight: FontWeight.w700, fontSize: 15)),
+                  Text(context.s.inviteFriends, style: TextStyle(color: context.clr.txtPrimary, fontWeight: FontWeight.w700, fontSize: 15)),
                   const SizedBox(height: 2),
-                  Text('Share the app on WhatsApp, SMS and more', style: TextStyle(color: context.clr.txtMuted, fontSize: 12)),
+                  Text(context.s.inviteSubtitle, style: TextStyle(color: context.clr.txtMuted, fontSize: 12)),
                 ]),
               ),
               Icon(Icons.share_rounded, color: accent),
@@ -52,6 +54,18 @@ class _InviteCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Opens the mail app addressed to support; falls back to showing the address.
+Future<void> _contactSupport(BuildContext context) async {
+  final uri = Uri(scheme: 'mailto', path: 'support@grahvarta.com', query: 'subject=Grahvarta app help');
+  final fallback = context.s.helpEmailFallback;
+  final messenger = ScaffoldMessenger.of(context);
+  bool opened = false;
+  try {
+    opened = await launchUrl(uri);
+  } catch (_) {}
+  if (!opened) messenger.showSnackBar(SnackBar(content: Text(fallback)));
 }
 
 class ProfileScreen extends StatelessWidget {
@@ -78,6 +92,7 @@ class ProfileScreen extends StatelessWidget {
                 Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
               }
             },
+            style: TextButton.styleFrom(minimumSize: const Size(48, 40), maximumSize: const Size(180, 48), padding: const EdgeInsets.symmetric(horizontal: 12)),
             child: Text(s.signOut, style: TextStyle(color: accentColor)),
           ),
         ],
@@ -103,9 +118,9 @@ class ProfileScreen extends StatelessWidget {
             _buildSection(context, s.account, cardColor, textMuted, [
               _buildTile(context, Icons.person_outline, s.editProfile, '', textMuted, accentColor,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen()))),
-              _buildTile(context, Icons.group_outlined, 'Family Members', 'Manage your family', accentColor, accentColor,
+              _buildTile(context, Icons.group_outlined, s.familyMembers, s.manageFamily, accentColor, accentColor,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FamilyMembersScreen()))),
-              _buildTile(context, Icons.chat_bubble_outline_rounded, 'Chat History', 'All astrologer conversations', accentColor, accentColor,
+              _buildTile(context, Icons.chat_bubble_outline_rounded, s.chatHistory, s.allConversations, accentColor, accentColor,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatHistoryScreen()))),
               _buildTile(context, Icons.privacy_tip_outlined, s.privacy, '', textMuted, accentColor,
                   onTap: () => _showPrivacyPolicy(context, cardColor, accentColor, textMuted)),
@@ -114,8 +129,13 @@ class ProfileScreen extends StatelessWidget {
             ]),
             const SizedBox(height: 16),
             _buildSection(context, s.about, cardColor, textMuted, [
-              _buildTile(context, Icons.help_outline, s.helpSupport, '', textMuted, accentColor),
-              _buildTile(context, Icons.info_outline, s.appVersion, '1.0.0', textMuted, accentColor),
+              _buildTile(context, Icons.help_outline, s.helpSupport, 'support@grahvarta.com', textMuted, accentColor,
+                  onTap: () => _contactSupport(context)),
+              FutureBuilder<PackageInfo>(
+                future: PackageInfo.fromPlatform(),
+                builder: (context, snap) => _buildTile(context, Icons.info_outline, s.appVersion,
+                    snap.hasData ? '${snap.data!.version} (${snap.data!.buildNumber})' : '', textMuted, accentColor),
+              ),
             ]),
             const SizedBox(height: 100),
           ],
@@ -130,11 +150,11 @@ class ProfileScreen extends StatelessWidget {
     return ListTile(
       leading: Icon(isDark ? Icons.dark_mode : Icons.light_mode, color: accentColor, size: 22),
       title: Text(
-        isDark ? 'Dark Theme' : 'Light Theme',
+        isDark ? context.s.darkTheme : context.s.lightTheme,
         style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 15),
       ),
       subtitle: Text(
-        isDark ? 'Switch to light mode' : 'Switch to dark mode',
+        isDark ? context.s.switchToLight : context.s.switchToDark,
         style: TextStyle(color: textMuted, fontSize: 12),
       ),
       trailing: Switch(
@@ -177,7 +197,10 @@ class ProfileScreen extends StatelessWidget {
           color: sheetBg,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: Column(
+        // Transparent Material so the language rows show their tap ripple
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16),
@@ -209,6 +232,7 @@ class ProfileScreen extends StatelessWidget {
               );
             }),
           ],
+        ),
         ),
       ),
     );
@@ -274,7 +298,7 @@ class ProfileScreen extends StatelessWidget {
                   body: 'You have the right to:\n• Access the personal data we hold about you\n• Correct inaccurate information\n• Request deletion of your account and data\n• Opt out of marketing communications\n• Data portability upon request',
                 ),
                 _PolicySection(title: '9. Contact Us', accentColor: accentColor, textSecondary: textSecondary,
-                  body: 'If you have any questions about this Privacy Policy or how we handle your data, please contact us at privacy@astrowaak.com or through the Help & Support section in the user.',
+                  body: 'If you have any questions about this Privacy Policy or how we handle your data, please contact us at support@grahvarta.com or through the Help & Support section in the user.',
                 ),
                 const SizedBox(height: 8),
                 Text('Last updated: January 2025', style: TextStyle(color: textMuted, fontSize: 11)),
@@ -311,8 +335,11 @@ class ProfileScreen extends StatelessWidget {
       children: [
         Text(title, style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1)),
         const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
+        // Material (not a decorated Container) so the tiles' tap ripple is visible
+        Material(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(16),
+          clipBehavior: Clip.antiAlias,
           child: Column(children: children),
         ),
       ],

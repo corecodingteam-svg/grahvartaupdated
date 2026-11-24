@@ -791,6 +791,12 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
       }
     });
 
+    // The host ended the session: leave instead of showing a frozen stream
+    _socket.on('live_ended', (data) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This live session has ended')));
+      Navigator.of(context).maybePop();
+    });
     // Join after listeners are set up
     _socket.joinLive(widget.session.id);
     _initAgora();
@@ -845,6 +851,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
     _socket.off('viewer_count');
     _socket.off('live_chat_message');
     _socket.off('new_tip');
+    _socket.off('live_ended');
     _chatCtrl.dispose();
     _scrollCtrl.dispose();
     _engine?.leaveChannel();

@@ -89,7 +89,7 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
           : type == 'voice'
               ? a.perMinuteRateCall
               : a.perMinuteRateVideo;
-      final minRequired = rate * 2; // minimum 2 minutes balance required
+      final minRequired = rate; // minimum 1 minute of balance (same rule as the server)
 
       if (balance < minRequired) {
         if (!mounted) return;
@@ -122,7 +122,7 @@ class _AstrologerProfileScreenState extends State<AstrologerProfileScreen>
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Your wallet balance is ₹${balance.toStringAsFixed(2)}.', style: TextStyle(color: context.clr.txtSecondary)),
           const SizedBox(height: 6),
-          Text('Minimum ₹${required.toStringAsFixed(0)} required (2 min @ ₹${rate.toInt()}/min).', style: TextStyle(color: context.clr.txtMuted, fontSize: 13)),
+          Text('Minimum ₹${required.toStringAsFixed(0)} required (1 min @ ₹${rate.toInt()}/min).', style: TextStyle(color: context.clr.txtMuted, fontSize: 13)),
           const SizedBox(height: 12),
           Text('Please add money to your wallet to continue.', style: TextStyle(color: context.clr.txtSecondary, fontSize: 13)),
         ]),

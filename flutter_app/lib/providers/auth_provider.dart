@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/chat_crypto.dart';
+import '../services/analytics_service.dart';
 
 class AstrologerProfile {
   final String id;
@@ -115,6 +116,7 @@ class AuthProvider extends ChangeNotifier {
       final token = await ApiService.getToken();
       if (token == null) return false;
       _user = await ApiService.getProfile();
+      AnalyticsService.instance.setUser(id: _user!.id, role: 'user');
       notifyListeners();
       _registerFcmToken();
       return true;
@@ -134,6 +136,8 @@ class AuthProvider extends ChangeNotifier {
       final data = await ApiService.login(email, password);
       await ApiService.saveToken(data['data']['token']);
       _user = User.fromJson(data['data']['user']);
+      AnalyticsService.instance.setUser(id: _user!.id, role: 'user');
+      AnalyticsService.instance.logLogin();
       _isLoading = false;
       notifyListeners();
       _registerFcmToken();
@@ -165,6 +169,8 @@ class AuthProvider extends ChangeNotifier {
       );
       await ApiService.saveToken(data['data']['token']);
       _user = User.fromJson(data['data']['user']);
+      AnalyticsService.instance.setUser(id: _user!.id, role: 'user');
+      AnalyticsService.instance.logSignUp();
       _isLoading = false;
       notifyListeners();
       _registerFcmToken();
@@ -178,6 +184,8 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    AnalyticsService.instance.log('logout');
+    AnalyticsService.instance.clearUser();
     await ApiService.clearToken();
       await ChatCrypto.instance.clear();
     _user = null;

@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'theme.dart';
 import 'screens/phone_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'analytics_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  // Crash-guarded: the app works without Firebase (analytics just stays off).
+  try {
+    await Firebase.initializeApp(options: firebaseWebOptions);
+    await AnalyticsService.instance.init(app: 'agent_onboarding');
+  } catch (e) {
+    debugPrint('Firebase init failed (non-fatal): $e');
+  }
   runApp(const AgentOnboardingApp());
 }
 
@@ -18,6 +27,7 @@ class AgentOnboardingApp extends StatelessWidget {
     title: 'Agent Onboarding',
     debugShowCheckedModeBanner: false,
     theme: buildTheme(),
+    navigatorObservers: [AnalyticsService.instance.observer],
     home: const _Splash(),
   );
 }

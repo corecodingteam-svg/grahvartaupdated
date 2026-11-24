@@ -1,9 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'analytics_service.dart';
 
 class ApiService {
-  static const String _base = 'https://api.grahvarta.com/api';
+  /// Backend host. Production by default; point a test build elsewhere with
+  /// `--dart-define=API_HOST=http://127.0.0.1:3300`.
+  static const String apiHost = String.fromEnvironment('API_HOST', defaultValue: 'https://api.grahvarta.com');
+  static const String _base = '$apiHost/api';
 
   static Future<String> uploadPhoto(File file) async {
     try {
@@ -49,6 +53,7 @@ class ApiService {
   /// (number / email / device already registered) or rate limit.
   static Future<void> sendEmailOtp({required String email, required String phone, required String deviceId}) async {
     await _post('/hirings/send-otp', {'email': email, 'phone': phone, 'device_id': deviceId});
+    AnalyticsService.instance.log('otp_sent');
   }
 
   /// Verifies the emailed code. Returns either
@@ -56,12 +61,19 @@ class ApiService {
   ///   {mode: 'login', application: {name, phone, token_no}} → returning agent
   static Future<Map<String, dynamic>> verifyEmailOtp({required String email, required String otp}) async {
     final body = await _post('/hirings/verify-otp', {'email': email, 'otp': otp});
-    return Map<String, dynamic>.from(body['data'] as Map);
+    final data = Map<String, dynamic>.from(body['data'] as Map);
+    if (data['mode'] == 'login') {
+      AnalyticsService.instance.logLogin(method: 'email_otp');
+    } else {
+      AnalyticsService.instance.log('otp_verified_new_agent');
+    }
+    return data;
   }
 
   /// "Write to Us": sends the message to Grahvarta (admin panel + support@grahvarta.com).
   static Future<void> sendSupportMessage({required String phone, required String deviceId, required String message}) async {
     await _post('/hirings/messages', {'phone': phone, 'device_id': deviceId, 'message': message}, okStatus: 201);
+    AnalyticsService.instance.log('support_message_sent');
   }
 
   /// The agent's earlier messages with any replies from Grahvarta (newest first).
@@ -80,6 +92,8 @@ class ApiService {
 
   static Future<Map<String, dynamic>> submitApplication(Map<String, dynamic> data) async {
     final body = await _post('/hirings/apply', data, okStatus: 201);
+    AnalyticsService.instance.logSignUp(method: 'email_otp');
+    AnalyticsService.instance.log('application_submitted');
     return body['data'] as Map<String, dynamic>;
   }
 
