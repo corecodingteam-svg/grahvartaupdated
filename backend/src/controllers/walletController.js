@@ -98,10 +98,25 @@ exports.adminListOffers = async (req, res) => {
   }
 };
 
+/** Validates offer values that are present: amount ₹1–₹100000, bonus 0–100%. */
+function offerError(amount, bonusPercent) {
+  if (amount != null) {
+    const a = Number(amount);
+    if (!Number.isFinite(a) || a < 1 || a > 100000) return 'Amount must be between ₹1 and ₹100000';
+  }
+  if (bonusPercent != null) {
+    const b = Number(bonusPercent);
+    if (!Number.isFinite(b) || b < 0 || b > 100) return 'Bonus must be between 0% and 100%';
+  }
+  return null;
+}
+
 exports.adminCreateOffer = async (req, res) => {
   try {
     const { amount, bonus_percent, label, sort_order = 0 } = req.body;
     if (!amount || bonus_percent == null) return res.status(400).json({ success: false, message: 'amount and bonus_percent are required' });
+    const offerErr = offerError(amount, bonus_percent);
+    if (offerErr) return res.status(400).json({ success: false, message: offerErr });
     const result = await db.query(
       'INSERT INTO recharge_offers (amount, bonus_percent, label, sort_order) VALUES ($1, $2, $3, $4) RETURNING *',
       [amount, bonus_percent, label || null, sort_order]
@@ -116,6 +131,8 @@ exports.adminCreateOffer = async (req, res) => {
 exports.adminUpdateOffer = async (req, res) => {
   try {
     const { amount, bonus_percent, label, sort_order, is_active } = req.body;
+    const offerErr = offerError(amount, bonus_percent);
+    if (offerErr) return res.status(400).json({ success: false, message: offerErr });
     const result = await db.query(
       `UPDATE recharge_offers SET amount = COALESCE($1, amount), bonus_percent = COALESCE($2, bonus_percent),
        label = COALESCE($3, label), sort_order = COALESCE($4, sort_order), is_active = COALESCE($5, is_active)
@@ -141,10 +158,17 @@ exports.adminDeleteOffer = async (req, res) => {
 };
 
 // Create Razorpay order to add money
+const MAX_RECHARGE = 100000; // ₹1 lakh per top-up
+
 exports.createAddMoneyOrder = async (req, res) => {
   try {
-    const { amount } = req.body; // amount in INR
+    // Always work with a real number: a string amount ("100") would otherwise be
+    // concatenated below (walletCredit "100" + 50 → "10050").
+    const amount = Number(req.body.amount); // INR
+    if (!Number.isFinite(amount)) return res.status(400).json({ success: false, message: 'Enter a valid amount' });
     if (amount < 50) return res.status(400).json({ success: false, message: 'Minimum recharge is ₹50' });
+    if (amount > MAX_RECHARGE) return res.status(400).json({ success: false, message: `Maximum recharge is ₹${MAX_RECHARGE}` });
+    if (Math.round(amount * 100) !== amount * 100) return res.status(400).json({ success: false, message: 'Amount can have at most 2 decimal places' });
 
     // Look up bonus for this amount
     const offerResult = await db.query(

@@ -213,6 +213,21 @@ exports.submitApplication = async (req, res) => {
     if (!device_id) return res.status(400).json({ success: false, message: 'Device could not be identified. Please update the app.' });
     if (!email_verification_token) return res.status(400).json({ success: false, message: 'Please verify your email address first' });
 
+    // Same rules as the app's registration form (the API must not rely on the app)
+    const bad = (message) => res.status(400).json({ success: false, message });
+    if (!name || String(name).trim().length < 2 || String(name).trim().length > 100) return bad('Full name is required');
+    if (!gender) return bad('Gender is required');
+    if (!Array.isArray(languages) || !languages.length) return bad('Select at least one language');
+    if (!about_me || !String(about_me).trim()) return bad('About Me is required');
+    if (!dob || Number.isNaN(Date.parse(dob))) return bad('Date of birth is required');
+    const dobTime = Date.parse(dob);
+    if (dobTime > Date.now() || new Date(dob).getFullYear() < 1900) return bad('Enter a valid date of birth');
+    if (dobTime > Date.now() - 18 * 365.25 * 24 * 3600 * 1000) return bad('Applicants must be at least 18 years old');
+    if (hours_available != null && hours_available !== '') {
+      const h = Number(hours_available);
+      if (!Number.isFinite(h) || h < 0 || h > 24) return bad('Hours available per day must be between 0 and 24');
+    }
+
     // The verified email must be the one submitted, and the token is single-use
     const otpRow = await db.query(
       `SELECT id, email, phone FROM hiring_email_otps
@@ -287,6 +302,10 @@ exports.listApplications = async (req, res) => {
 // Admin: activate as astrologer
 exports.activateAsAstrologer = async (req, res) => {
   const client = await db.pool.connect();
+  // Early returns below happen inside the transaction: always roll back
+  // uncommitted work before the connection goes back to the pool, otherwise
+  // later queries on that pooled connection run inside a dangling transaction.
+  let committed = false;
   try {
     await client.query('BEGIN');
 
@@ -334,6 +353,7 @@ exports.activateAsAstrologer = async (req, res) => {
     );
 
     await client.query('COMMIT');
+    committed = true;
 
     // Send welcome email (non-fatal — DB changes already committed)
     let emailSent = false;
@@ -361,10 +381,12 @@ exports.activateAsAstrologer = async (req, res) => {
       email_sent: emailSent,
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
+    committed = true; // already rolled back
     console.error('activateAsAstrologer error:', err);
     res.status(500).json({ success: false, message: err.message || 'Server error' });
   } finally {
+    if (!committed) await client.query('ROLLBACK').catch(() => {});
     client.release();
   }
 };

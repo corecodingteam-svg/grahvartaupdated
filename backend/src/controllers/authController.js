@@ -146,6 +146,9 @@ exports.getProfile = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const { name, date_of_birth, time_of_birth, birth_place, avatar_url } = req.body;
+    if (name !== undefined && (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100)) {
+      return res.status(400).json({ success: false, message: 'Name must be 2–100 characters' });
+    }
     const sunSign = date_of_birth ? getSunSign(date_of_birth) : req.user.sun_sign;
 
     const result = await db.query(
@@ -185,6 +188,9 @@ exports.changePassword = async (req, res) => {
     }
     if (new_password.length < 6) {
       return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
+    }
+    if (new_password === current_password) {
+      return res.status(400).json({ success: false, message: 'New password must be different from the current one' });
     }
 
     const result = await db.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);

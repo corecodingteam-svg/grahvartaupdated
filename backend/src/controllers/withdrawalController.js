@@ -17,6 +17,13 @@ exports.savePayoutDetails = async (req, res) => {
     if (!astroResult.rows.length) return res.status(403).json({ success: false, message: 'Not an astrologer' });
     const astrologerId = astroResult.rows[0].id;
 
+    if (!['upi', 'paytm', 'bank'].includes(method)) return res.status(400).json({ success: false, message: 'Payout method must be upi, paytm or bank' });
+    if (method === 'bank' && bank_ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(String(bank_ifsc).toUpperCase())) {
+      return res.status(400).json({ success: false, message: 'Enter a valid IFSC code' });
+    }
+    if (method === 'bank' && bank_account_number && !/^\d{9,18}$/.test(String(bank_account_number))) {
+      return res.status(400).json({ success: false, message: 'Account number must be 9–18 digits' });
+    }
     if (method === 'upi' && !upi_id) return res.status(400).json({ success: false, message: 'UPI ID required' });
     if (method === 'paytm' && !paytm_number) return res.status(400).json({ success: false, message: 'Paytm number required' });
     if (method === 'bank' && (!bank_account_number || !bank_ifsc || !bank_account_name)) {
@@ -103,7 +110,10 @@ exports.getPayoutDetails = async (req, res) => {
 // ── Request withdrawal ────────────────────────────────────────────────────────
 exports.requestWithdrawal = async (req, res) => {
   try {
-    const { amount } = req.body;
+    const amount = Number(req.body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ success: false, message: 'Enter a valid amount' });
+    }
 
     const astroResult = await db.query('SELECT * FROM astrologers WHERE user_id = $1', [req.user.id]);
     if (!astroResult.rows.length) return res.status(403).json({ success: false, message: 'Not an astrologer' });

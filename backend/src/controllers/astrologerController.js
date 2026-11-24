@@ -70,7 +70,23 @@ exports.getAstrologerReviews = async (req, res) => {
 
 exports.submitReview = async (req, res) => {
   try {
-    const { rating, review_text, consultation_id, is_anonymous } = req.body;
+    const { review_text, consultation_id, is_anonymous } = req.body;
+    const rating = Number(req.body.rating);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ success: false, message: 'Rating must be a whole number from 1 to 5' });
+    }
+    if (review_text != null && String(review_text).length > 2000) {
+      return res.status(400).json({ success: false, message: 'Review is too long (max 2000 characters)' });
+    }
+    // Only someone who actually consulted this astrologer can review that session
+    if (!consultation_id) return res.status(400).json({ success: false, message: 'consultation_id is required' });
+    const own = await db.query(
+      `SELECT 1 FROM consultations WHERE id = $1 AND user_id = $2 AND astrologer_id = $3 AND status = 'completed'`,
+      [consultation_id, req.user.id, req.params.id]
+    ).catch(() => ({ rows: [] }));
+    if (!own.rows.length) {
+      return res.status(403).json({ success: false, message: 'You can only review a completed consultation with this astrologer' });
+    }
 
     await db.query(`
       INSERT INTO astrologer_reviews (astrologer_id, user_id, consultation_id, rating, review_text, is_anonymous)
@@ -143,6 +159,10 @@ exports.getConsultationMessages = async (req, res) => {
   }
 };
 
+// Per-minute rates: positive rupees, capped to catch typos (e.g. 100000)
+const MAX_RATE = 10000;
+const badRate = (v) => v !== undefined && v !== null && v !== '' && !(Number.isFinite(Number(v)) && Number(v) > 0 && Number(v) <= MAX_RATE);
+
 exports.registerAsAstrologer = async (req, res) => {
   try {
     const { display_name, bio, experience_years, languages, specializations, expertise_areas,
@@ -150,6 +170,19 @@ exports.registerAsAstrologer = async (req, res) => {
 
     const existing = await db.query('SELECT id FROM astrologers WHERE user_id = $1', [req.user.id]);
     if (existing.rows.length) return res.status(409).json({ success: false, message: 'Already registered as astrologer' });
+
+    // Same rules as the app's setup form
+    const bad = (message) => res.status(400).json({ success: false, message });
+    if (!display_name || String(display_name).trim().length < 2) return bad('Display name is required');
+    if (!bio || !String(bio).trim()) return bad('Bio is required');
+    if (!Array.isArray(languages) || !languages.length) return bad('Please select at least one language');
+    if (experience_years != null && experience_years !== '') {
+      const y = Number(experience_years);
+      if (!Number.isInteger(y) || y < 0 || y > 80) return bad('Experience must be between 0 and 80 years');
+    }
+    if ([per_minute_rate_chat, per_minute_rate_call, per_minute_rate_video].some(badRate)) {
+      return bad(`Rates must be numbers between ₹1 and ₹${MAX_RATE} per minute`);
+    }
 
     const result = await db.query(`
       INSERT INTO astrologers (user_id, display_name, bio, experience_years, languages, specializations,

@@ -154,7 +154,7 @@ class BillingEngine {
     }
   }
 
-  async stop() {
+  async stop({ waiveMinimum = false } = {}) {
     if (this._stopped) return;
     this._stopped = true;
     if (this.interval) {
@@ -165,7 +165,7 @@ class BillingEngine {
     const MINIMUM_CHARGE = 1;
 
     // Charge minimum ₹1 if call was connected but less than 1 minute elapsed
-    if (this.secondsElapsed > 0 && this.totalCharged === 0) {
+    if (!waiveMinimum && this.secondsElapsed > 0 && this.totalCharged === 0) {
       try {
         const walletResult = await this.db.query(
           'SELECT id, balance FROM wallets WHERE user_id = $1', [this.userId]

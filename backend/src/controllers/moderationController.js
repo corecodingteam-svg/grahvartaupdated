@@ -144,6 +144,7 @@ exports.hold = async (req, res) => {
       [String(hours), reason, subject.id]
     );
     const holdUntil = r.rows[0].hold_until;
+    await req.io?.endConsultationsFor?.({ userId: subject.id }, 'account_on_hold').catch(() => {});
     if (subject.astrologer_id) {
       await db.query('UPDATE astrologers SET is_online = FALSE, is_available = FALSE WHERE id = $1', [subject.astrologer_id]);
       await recordPresence(subject.astrologer_id, false);
@@ -191,6 +192,7 @@ exports.lock = async (req, res) => {
     const reason = (req.body.reason || '').trim() || 'Repeated violation of Grahvarta communication rules';
 
     await db.query('UPDATE users SET is_banned = TRUE, lock_reason = $1 WHERE id = $2', [reason, subject.id]);
+    await req.io?.endConsultationsFor?.({ userId: subject.id }, 'account_locked').catch(() => {});
     if (subject.astrologer_id) {
       await db.query(
         'UPDATE astrologers SET is_banned = TRUE, ban_reason = $1, is_online = FALSE, is_available = FALSE WHERE id = $2',

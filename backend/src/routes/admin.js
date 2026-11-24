@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const { body } = require('express-validator');
+const validate = require('../middleware/validate');
 const { authenticateAdmin, requirePermission } = require('../middleware/adminAuth');
 const ctrl = require('../controllers/adminController');
 const moderation = require('../controllers/moderationController');
@@ -10,9 +11,9 @@ router.use(auditAdminActions);
 
 // Auth (no middleware)
 router.post('/login', [
-  body('email').isEmail().normalizeEmail(),
-  body('password').exists(),
-], ctrl.login);
+  body('email').trim().isEmail().withMessage('Enter a valid email address').normalizeEmail(),
+  body('password').isString().notEmpty().withMessage('Password is required'),
+], validate, ctrl.login);
 
 // All routes below require admin token
 router.use(authenticateAdmin);
@@ -82,13 +83,13 @@ router.get('/reports/:id/stats', ctrl.getReportStats);
 // Wallet & Transactions
 router.get('/transactions', ctrl.listTransactions);
 router.post('/wallet/credit', [
-  body('user_id').notEmpty(),
-  body('amount').isFloat({ gt: 0 }),
-], ctrl.manualCredit);
+  body('user_id').isUUID().withMessage('Valid user_id required'),
+  body('amount').isFloat({ gt: 0, max: 1000000 }).withMessage('Amount must be a positive number').toFloat(),
+], validate, ctrl.manualCredit);
 router.post('/wallet/debit', [
-  body('user_id').notEmpty(),
-  body('amount').isFloat({ gt: 0 }),
-], ctrl.manualDebit);
+  body('user_id').isUUID().withMessage('Valid user_id required'),
+  body('amount').isFloat({ gt: 0, max: 1000000 }).withMessage('Amount must be a positive number').toFloat(),
+], validate, ctrl.manualDebit);
 router.post('/transactions/:id/refund', ctrl.refundTransaction);
 
 // Withdrawal Requests
@@ -104,13 +105,13 @@ router.delete('/community/:id', ctrl.deletePostAdmin);
 
 // Push Notifications
 router.post('/notifications/broadcast', [
-  body('title').notEmpty(),
-  body('body').notEmpty(),
-], ctrl.sendBroadcastNotification);
+  body('title').trim().notEmpty().withMessage('Title is required'),
+  body('body').trim().notEmpty().withMessage('Message is required'),
+], validate, ctrl.sendBroadcastNotification);
 router.post('/notifications/segment', [
-  body('title').notEmpty(),
-  body('body').notEmpty(),
-], ctrl.sendSegmentedNotification);
+  body('title').trim().notEmpty().withMessage('Title is required'),
+  body('body').trim().notEmpty().withMessage('Message is required'),
+], validate, ctrl.sendSegmentedNotification);
 
 const hiringCtrl = require('../controllers/hiringController');
 router.get('/hirings', hiringCtrl.listApplications);
@@ -148,10 +149,10 @@ router.get('/audit-logs/filters', requireSuperAdmin, ctrl.getAuditLogFilters);
 // Sub-admin Management (superadmin only)
 router.get('/sub-admins', requireSuperAdmin, ctrl.listSubAdmins);
 router.post('/sub-admins', requireSuperAdmin, [
-  body('name').notEmpty(),
-  body('email').isEmail(),
-  body('password').isLength({ min: 6 }),
-], ctrl.createSubAdmin);
+  body('name').trim().notEmpty().withMessage('Name is required'),
+  body('email').trim().isEmail().withMessage('Enter a valid email address'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+], validate, ctrl.createSubAdmin);
 router.put('/sub-admins/:id', requireSuperAdmin, ctrl.updateSubAdmin);
 router.delete('/sub-admins/:id', requireSuperAdmin, ctrl.deleteSubAdmin);
 

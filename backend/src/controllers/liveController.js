@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { detectContactInfo, blockedMessageText } = require('../utils/contactFilter');
 const admin = require('firebase-admin');
 
 // Both apps (com.grahvarta.user and com.grahvartaastrology.app) are in the same
@@ -180,14 +181,18 @@ exports.createLiveSession = async (req, res) => {
   }
 };
 
+// Only the hosting astrologer may start/end their own session
+const ownSessionFilter = `astrologer_id = (SELECT id FROM astrologers WHERE user_id = $2)`;
+
 exports.startLiveSession = async (req, res) => {
   try {
     const result = await db.query(`
       UPDATE live_sessions SET status = 'live', started_at = NOW()
-      WHERE id = $1 RETURNING *
-    `, [req.params.id]);
+      WHERE id = $1 AND ${ownSessionFilter} AND status = 'scheduled' RETURNING *
+    `, [req.params.id, req.user.id]);
 
     const session = result.rows[0];
+    if (!session) return res.status(404).json({ success: false, message: 'Live session not found or already started' });
 
     // Push to all users when live session actually starts
     const allUsers = await db.query('SELECT DISTINCT user_id FROM push_tokens');
@@ -214,8 +219,11 @@ exports.endLiveSession = async (req, res) => {
         status = 'ended',
         ended_at = NOW(),
         duration_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))::INTEGER
-      WHERE id = $1 RETURNING *
-    `, [req.params.id]);
+      WHERE id = $1 AND ${ownSessionFilter} AND status IN ('scheduled', 'live') RETURNING *
+    `, [req.params.id, req.user.id]);
+    if (!result.rows.length) return res.status(404).json({ success: false, message: 'Live session not found or already ended' });
+    // Tell everyone watching so their screens close instead of freezing
+    req.io?.to(`live:${req.params.id}`).emit('live_ended', { session_id: req.params.id });
     res.json({ success: true, data: result.rows[0] });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -254,7 +262,13 @@ exports.getCommunityPosts = async (req, res) => {
 
 exports.createPost = async (req, res) => {
   try {
-    const { content, category, zodiac_sign, media_url, media_type } = req.body;
+    const { category, zodiac_sign, media_url, media_type } = req.body;
+    const content = typeof req.body.content === 'string' ? req.body.content.trim() : '';
+    if (!content && !media_url) return res.status(400).json({ success: false, message: 'Write something to post' });
+    if (content.length > 2000) return res.status(400).json({ success: false, message: 'Post is too long (max 2000 characters)' });
+    // Same rule as chat: no phone numbers / email addresses in public posts
+    const contact = detectContactInfo(content);
+    if (contact.blocked) return res.status(400).json({ success: false, code: 'contact_sharing', message: blockedMessageText(contact.detected) });
     const result = await db.query(`
       INSERT INTO community_posts (user_id, content, category, zodiac_sign, media_url, media_type, status)
       VALUES ($1, $2, $3, $4, $5, $6, 'pending') RETURNING *

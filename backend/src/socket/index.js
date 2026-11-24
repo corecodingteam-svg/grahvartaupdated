@@ -14,6 +14,23 @@ const activeRooms = new Map();    // consultationId -> { userId, astrologerId, t
 const onlineUsers = new Map();       // userId -> socketId
 const offlineTimers = new Map();     // astrologerId -> pending "go offline" timer
 
+// Cross-process mutex (the API runs in PM2 cluster mode, so an in-memory lock
+// is not enough). Serialises e.g. two devices of one user requesting at once,
+// or an astrologer accepting two requests at the same moment.
+async function withLock(key, fn) {
+  const client = await db.pool.connect();
+  try {
+    await client.query('SELECT pg_advisory_lock(hashtext($1))', [key]);
+    try {
+      return await fn();
+    } finally {
+      await client.query('SELECT pg_advisory_unlock(hashtext($1))', [key]).catch(() => {});
+    }
+  } finally {
+    client.release();
+  }
+}
+
 // An astrologer can have several sockets at once (app reconnects, a second
 // device, the web portal). Every astrologer socket joins this room; the
 // astrologer is "connected" while the room is non-empty.
@@ -67,6 +84,112 @@ function initSocket(io) {
     target.emit(event, payload);
   }
   io.emitToParties = (id, ev, data) => emitToParties(id, ev, data).catch(err => console.error('[emitToParties]', err.message));
+
+  // ─── Ending consultations (shared by "End", disconnects and admin bans) ───
+  const disconnectTimers = new Map(); // consultationId -> pending end after a disconnect
+  const RECONNECT_GRACE_MS = parseInt(process.env.RECONNECT_GRACE_MS, 10) || 20000;
+
+  /**
+   * Ends a queued or active consultation: stops billing (settling the charge),
+   * frees the queue and tells both parties. `by` is 'user' | 'astrologer' |
+   * 'system' | 'admin'; `reason` defaults to what the party's action means.
+   */
+  async function finishConsultation(consultation_id, { by = 'system', reason, waiveMinimum = false } = {}) {
+    const pending = disconnectTimers.get(consultation_id);
+    if (pending) { clearTimeout(pending); disconnectTimers.delete(consultation_id); }
+    const cur = await db.query('SELECT status FROM consultations WHERE id = $1', [consultation_id]).catch(() => ({ rows: [] }));
+    const st = cur.rows[0]?.status;
+    if (!st || ['completed', 'cancelled', 'missed'].includes(st)) return false;
+    // Ending a request that was never accepted = declined (astrologer) / cancelled (user)
+    const endReason = reason || (st === 'queued' ? (by === 'astrologer' ? 'declined' : 'cancelled') : 'ended');
+    await recordEnd(consultation_id, endReason, by);
+    transcription.stop(consultation_id).catch(() => {});
+    const engine = billingEngines.get(consultation_id);
+    if (engine) {
+      await engine.stop({ waiveMinimum });
+      billingEngines.delete(consultation_id);
+    } else {
+      // No billing engine — update DB directly so session doesn't stay active.
+      // A request that was never accepted is a cancellation (and frees the queue).
+      const prev = await db.query(
+        `UPDATE consultations SET status = CASE WHEN status = 'queued' THEN 'cancelled' ELSE 'completed' END, ended_at=NOW()
+         WHERE id=$1 AND status NOT IN ('completed','cancelled','missed')
+         RETURNING status, astrologer_id`,
+        [consultation_id]
+      );
+      if (prev.rows[0]?.status === 'cancelled') {
+        await db.query(`UPDATE consultation_queue SET status='cancelled' WHERE consultation_id=$1`, [consultation_id]).catch(() => {});
+        await db.query('UPDATE astrologers SET queue_count = GREATEST(queue_count - 1, 0) WHERE id = $1', [prev.rows[0].astrologer_id]).catch(() => {});
+      }
+    }
+    activeRooms.delete(consultation_id);
+
+    const result = await db.query('SELECT * FROM consultations WHERE id = $1', [consultation_id]);
+    if (result.rows.length) {
+      const consult = result.rows[0];
+      const durationMin = Math.ceil((consult.duration_seconds || 0) / 60);
+      const amount = parseFloat(consult.total_amount || 0).toFixed(2);
+
+      io.emitToParties(consultation_id, 'consultation_ended', {
+        consultation_id,
+        reason: endReason,
+        duration: consult.duration_seconds,
+        total_amount: consult.total_amount,
+      });
+
+      if (consult.user_id) {
+        await sendPushNotification(
+          [consult.user_id],
+          'Consultation Ended',
+          `Your consultation has ended. Duration: ${durationMin} min | ₹${amount} charged.`,
+          { type: 'call_ended', consultation_id }
+        );
+      }
+
+      // Notify astrologer
+      if (consult.astrologer_id) {
+        const astroUser = await db.query('SELECT user_id FROM astrologers WHERE id = $1', [consult.astrologer_id]);
+        if (astroUser.rows.length) {
+          const earned = (parseFloat(consult.total_amount || 0) * 0.8).toFixed(2);
+          await sendPushNotification(
+            [astroUser.rows[0].user_id],
+            'Session Completed',
+            `Session ended. Duration: ${durationMin} min | ₹${earned} earned.`,
+            { type: 'session_ended', consultation_id }
+          );
+        }
+      }
+    }
+    return true;
+  }
+  io.finishConsultation = finishConsultation;
+
+  /** Ends every queued/active consultation of a user (as client or as astrologer) or of an astrologer. */
+  io.endConsultationsFor = async ({ userId, astrologerId }, reason) => {
+    const r = userId
+      ? await db.query(
+          `SELECT id FROM consultations WHERE status IN ('queued','active')
+             AND (user_id = $1 OR astrologer_id IN (SELECT id FROM astrologers WHERE user_id = $1))`, [userId])
+      : await db.query(`SELECT id FROM consultations WHERE status IN ('queued','active') AND astrologer_id = $1`, [astrologerId]);
+    for (const row of r.rows) await finishConsultation(row.id, { by: 'admin', reason }).catch(err => console.error('[endConsultationsFor]', err.message));
+    return r.rows.length;
+  };
+
+  /** After a party's socket drops, wait for a reconnect before ending the session. */
+  function scheduleDisconnectEnd(consultationId, stillGone, reason, waiveMinimum) {
+    if (disconnectTimers.has(consultationId)) return;
+    io.emitToParties(consultationId, 'peer_disconnected', { consultation_id: consultationId, reason, grace_seconds: Math.round(RECONNECT_GRACE_MS / 1000) });
+    disconnectTimers.set(consultationId, setTimeout(async () => {
+      disconnectTimers.delete(consultationId);
+      try {
+        if (await stillGone()) await finishConsultation(consultationId, { by: 'system', reason, waiveMinimum });
+      } catch (err) {
+        console.error('[reconnect-grace] end failed:', err.message);
+      }
+    }, RECONNECT_GRACE_MS));
+  }
+  const userInRoom = async (consultationId, uid) =>
+    (await io.in(`consultation:${consultationId}`).fetchSockets()).some((s) => s.user?.id === uid);
 
   // Server start: nobody is connected yet, so nobody is online. Sockets that
   // reconnect re-announce themselves via set_role.
@@ -149,8 +272,10 @@ function initSocket(io) {
     });
 
     // ─── CONSULTATION REQUEST ────────────────────────────────────
-    socket.on('request_consultation', async ({ astrologer_id, type }) => {
+    socket.on('request_consultation', async (args = {}) => {
       socket.cancelledRequest = null;
+      return withLock(`consult_user:${userId}`, async () => {
+      const { astrologer_id, type } = args;
       try {
         console.log(`[request_consultation] user=${userId} astrologer_id=${astrologer_id} type=${type}`);
 
@@ -327,6 +452,7 @@ function initSocket(io) {
         console.error('Consultation request error:', err);
         socket.emit('error', { message: 'Failed to create consultation' });
       }
+      });
     });
 
     // ─── AUTHORIZATION: is this socket's user a party to the consultation? ──
@@ -379,9 +505,19 @@ function initSocket(io) {
     const inRoom = (consultationId) => socket.rooms.has(`consultation:${consultationId}`);
 
     // ─── ASTROLOGER ACCEPTS ──────────────────────────────────────
-    socket.on('accept_consultation', async ({ consultation_id }) => {
+    socket.on('accept_consultation', async ({ consultation_id } = {}) => {
+      if ((await partyOf(consultation_id)) !== 'astrologer') return;
+      return withLock(`consult_astro:${socket.astrologerId || userId}`, async () => {
       try {
-        if ((await partyOf(consultation_id)) !== 'astrologer') return;
+        // One live session per astrologer: a second accept while busy is refused
+        const busy = await db.query(
+          `SELECT 1 FROM consultations o JOIN consultations c ON c.astrologer_id = o.astrologer_id
+           WHERE c.id = $1 AND o.status = 'active' AND o.id <> $1 LIMIT 1`,
+          [consultation_id]
+        );
+        if (busy.rows.length) {
+          return socket.emit('error', { code: 'already_in_session', message: 'Finish your current consultation before accepting another.' });
+        }
         const now = new Date();
         // Only a still-queued request can be accepted (also prevents a double
         // accept from starting two billing engines)
@@ -429,12 +565,16 @@ function initSocket(io) {
       } catch (err) {
         console.error('Accept error:', err);
       }
+      });
     });
 
     // ─── JOIN EXISTING CONSULTATION ROOM (astrologer portal chat) ──
-    socket.on('join_consultation', async ({ consultation_id }) => {
-      if (!(await partyOf(consultation_id))) return;
+    socket.on('join_consultation', async ({ consultation_id } = {}) => {
+      const party = await partyOf(consultation_id);
+      if (!party) return;
       socket.join(`consultation:${consultation_id}`);
+      // A reconnected user socket must also end/grace the session if it drops again
+      if (party === 'user') socket.consultationId = consultation_id;
       // Reconnected after the other side already hung up / declined? Tell it now.
       const st = await db.query('SELECT status, duration_seconds, total_amount FROM consultations WHERE id = $1', [consultation_id]).catch(() => ({ rows: [] }));
       const status = st.rows[0]?.status;
@@ -467,6 +607,10 @@ function initSocket(io) {
         const party = await partyOf(consultation_id);
         if (!party) return;
         if (!['text', 'image', 'e2e'].includes(message_type)) return;
+        const cst = await db.query('SELECT status FROM consultations WHERE id = $1', [consultation_id]);
+        if (!['queued', 'active'].includes(cst.rows[0]?.status)) {
+          return socket.emit('error', { code: 'session_not_active', message: 'This consultation has ended.', consultation_id });
+        }
         if (typeof content !== 'string' || !content.trim()) return;
         if (message_type !== 'e2e' && content.length > 5000) return;
 
@@ -629,72 +773,10 @@ function initSocket(io) {
     });
 
     // ─── END CONSULTATION ────────────────────────────────────────
-    socket.on('end_consultation', async ({ consultation_id }) => {
+    socket.on('end_consultation', async ({ consultation_id } = {}) => {
       const party = await partyOf(consultation_id);
       if (!party) return;
-      {
-        // Ending a request that was never accepted = declined (astrologer) / cancelled (user)
-        const cur = await db.query('SELECT status FROM consultations WHERE id = $1', [consultation_id]).catch(() => ({ rows: [] }));
-        const st = cur.rows[0]?.status;
-        if (st === 'queued') await recordEnd(consultation_id, party === 'astrologer' ? 'declined' : 'cancelled', party);
-        else if (st === 'active') await recordEnd(consultation_id, 'ended', party);
-      }
-      transcription.stop(consultation_id).catch(() => {});
-      const engine = billingEngines.get(consultation_id);
-      if (engine) {
-        await engine.stop();
-        billingEngines.delete(consultation_id);
-      } else {
-        // No billing engine — update DB directly so session doesn't stay active.
-        // A request that was never accepted is a cancellation (and frees the queue).
-        const prev = await db.query(
-          `UPDATE consultations SET status = CASE WHEN status = 'queued' THEN 'cancelled' ELSE 'completed' END, ended_at=NOW()
-           WHERE id=$1 AND status NOT IN ('completed','cancelled','missed')
-           RETURNING status, astrologer_id`,
-          [consultation_id]
-        );
-        if (prev.rows[0]?.status === 'cancelled') {
-          await db.query(`UPDATE consultation_queue SET status='cancelled' WHERE consultation_id=$1`, [consultation_id]).catch(() => {});
-          await db.query('UPDATE astrologers SET queue_count = GREATEST(queue_count - 1, 0) WHERE id = $1', [prev.rows[0].astrologer_id]).catch(() => {});
-        }
-      }
-      activeRooms.delete(consultation_id);
-
-      const result = await db.query('SELECT * FROM consultations WHERE id = $1', [consultation_id]);
-      if (result.rows.length) {
-        const consult = result.rows[0];
-        const durationMin = Math.ceil((consult.duration_seconds || 0) / 60);
-        const amount = parseFloat(consult.total_amount || 0).toFixed(2);
-
-        io.emitToParties(consultation_id, 'consultation_ended', {
-          consultation_id,
-          duration: consult.duration_seconds,
-          total_amount: consult.total_amount,
-        });
-
-        if (consult.user_id) {
-          await sendPushNotification(
-            [consult.user_id],
-            'Consultation Ended',
-            `Your consultation has ended. Duration: ${durationMin} min | ₹${amount} charged.`,
-            { type: 'call_ended', consultation_id }
-          );
-        }
-
-        // Notify astrologer
-        if (consult.astrologer_id) {
-          const astroUser = await db.query('SELECT user_id FROM astrologers WHERE id = $1', [consult.astrologer_id]);
-          if (astroUser.rows.length) {
-            const earned = (parseFloat(consult.total_amount || 0) * 0.8).toFixed(2);
-            await sendPushNotification(
-              [astroUser.rows[0].user_id],
-              'Session Completed',
-              `Session ended. Duration: ${durationMin} min | ₹${earned} earned.`,
-              { type: 'session_ended', consultation_id }
-            );
-          }
-        }
-      }
+      await finishConsultation(consultation_id, { by: party });
     });
 
     // ─── LIVE SESSION ────────────────────────────────────────────
@@ -730,13 +812,42 @@ function initSocket(io) {
     socket.on('send_tip', async ({ session_id, amount, message }) => {
       try {
         if (await blockedFromLive(session_id)) return socket.emit('error', { message: 'This live session is not available to you.', code: 'blocked' });
-        const walletResult = await db.query('SELECT balance FROM wallets WHERE user_id = $1', [userId]);
-        const balance = walletResult.rows[0]?.balance || 0;
-        if (balance < amount) return socket.emit('error', { message: 'Insufficient balance' });
+        // Amount must be a positive whole-rupee value (a negative "tip" would credit the sender)
+        const tipAmount = Number(amount);
+        if (!Number.isFinite(tipAmount) || tipAmount < 1 || tipAmount > 100000 || Math.round(tipAmount) !== tipAmount) {
+          return socket.emit('error', { message: 'Enter a valid tip amount', code: 'invalid_amount' });
+        }
+        const live = await db.query(`SELECT id FROM live_sessions WHERE id = $1 AND status = 'live'`, [session_id]).catch(() => ({ rows: [] }));
+        if (!live.rows.length) return socket.emit('error', { message: 'This live session has ended.', code: 'live_not_active' });
 
-        await db.query('UPDATE wallets SET balance = balance - $1 WHERE user_id = $2', [amount, userId]);
-        await db.query('INSERT INTO live_tips (session_id, user_id, amount, message) VALUES ($1, $2, $3, $4)', [session_id, userId, amount, message]);
-        await db.query('UPDATE live_sessions SET total_tips = total_tips + $1 WHERE id = $2', [amount, session_id]);
+        // Debit atomically (no check-then-update race) and keep a wallet history entry
+        const client = await db.pool.connect();
+        let debited = null;
+        try {
+          await client.query('BEGIN');
+          const w = await client.query(
+            'UPDATE wallets SET balance = balance - $1, total_spent = total_spent + $1 WHERE user_id = $2 AND balance >= $1 RETURNING id, balance',
+            [tipAmount, userId]
+          );
+          if (w.rows.length) {
+            debited = w.rows[0];
+            await client.query(
+              `INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, balance_before, balance_after, description, reference_id, reference_type)
+               VALUES ($1, $2, 'debit', $3, $4, $5, 'Live session tip', $6, 'live_tip')`,
+              [debited.id, userId, tipAmount, parseFloat(debited.balance) + tipAmount, debited.balance, session_id]
+            );
+            await client.query('INSERT INTO live_tips (session_id, user_id, amount, message) VALUES ($1, $2, $3, $4)', [session_id, userId, tipAmount, message]);
+            await client.query('UPDATE live_sessions SET total_tips = total_tips + $1 WHERE id = $2', [tipAmount, session_id]);
+          }
+          await client.query('COMMIT');
+        } catch (e) {
+          await client.query('ROLLBACK').catch(() => {});
+          throw e;
+        } finally {
+          client.release();
+        }
+        if (!debited) return socket.emit('error', { message: 'Insufficient balance' });
+        amount = tipAmount;
 
         io.to(`live:${session_id}`).emit('new_tip', {
           user: socket.user.name,
@@ -789,46 +900,26 @@ function initSocket(io) {
           }, OFFLINE_GRACE_MS));
         }
 
-        // If astrologer disconnects mid-session, refund user for unused partial minute
-        // (skipped while another of their sockets — e.g. a reconnect — is still live)
-        if (socket.consultationId && !isAstrologerConnected(astrologerId)) {
-          transcription.stop(socket.consultationId).catch(() => {});
-          const engine = billingEngines.get(socket.consultationId);
-          if (engine) {
-            await recordEnd(socket.consultationId, 'astrologer_disconnected', 'system');
-            const partialSeconds = engine.secondsElapsed % 60;
-            if (partialSeconds > 0) {
-              const refund = parseFloat(((partialSeconds / 60) * engine.ratePerMinute).toFixed(2));
-              if (refund > 0) {
-                await db.query('UPDATE wallets SET balance = balance + $1 WHERE user_id = $2', [refund, engine.userId]);
-              }
-            }
-            await engine.stop();
-            billingEngines.delete(socket.consultationId);
-            io.emitToParties(socket.consultationId, 'consultation_ended', {
-              consultation_id: socket.consultationId,
-              reason: 'astrologer_disconnected',
-              duration: engine.secondsElapsed,
-              total_amount: engine.totalCharged,
-            });
+        // Astrologer dropped mid-session: give them RECONNECT_GRACE_MS to come back,
+        // then end it. Billing is per completed minute, so nothing needs refunding;
+        // the ₹1 minimum is waived because the astrologer left.
+        if (!isAstrologerConnected(astrologerId)) {
+          const act = await db.query(`SELECT id FROM consultations WHERE astrologer_id = $1 AND status = 'active'`, [astrologerId]).catch(() => ({ rows: [] }));
+          for (const { id } of act.rows) {
+            scheduleDisconnectEnd(id, async () => !isAstrologerConnected(astrologerId), 'astrologer_disconnected', true);
           }
         }
       }
       // If user disconnects mid-session, end the active consultation
       if (!socket.astrologerId && socket.consultationId) {
-        transcription.stop(socket.consultationId).catch(() => {});
-        const engine = billingEngines.get(socket.consultationId);
-        await recordEnd(socket.consultationId, 'user_disconnected', 'system');
-        if (engine) {
-          await engine.stop();
-          billingEngines.delete(socket.consultationId);
-          io.emitToParties(socket.consultationId, 'consultation_ended', {
-            consultation_id: socket.consultationId,
-            reason: 'user_disconnected',
-            duration: engine.secondsElapsed,
-            total_amount: engine.totalCharged,
-          });
+        const cid = socket.consultationId;
+        if (billingEngines.get(cid)) {
+          // Active session: brief network drops / app backgrounding shouldn't kill a
+          // paid consultation — end it only if the user hasn't rejoined in time.
+          scheduleDisconnectEnd(cid, async () => !(await userInRoom(cid, userId)), 'user_disconnected', false);
         } else {
+          transcription.stop(cid).catch(() => {});
+          await recordEnd(cid, 'user_disconnected', 'system');
           // Still waiting for the astrologer: cancel it (frees the queue and closes their popup)
           if (!(await cancelQueued(socket.consultationId, 'user_disconnected', 'system'))) {
             // Active but not billing yet (e.g. a chat that had not started)
@@ -841,8 +932,8 @@ function initSocket(io) {
             consultation_id: socket.consultationId,
             reason: 'user_disconnected',
           });
+          activeRooms.delete(socket.consultationId);
         }
-        activeRooms.delete(socket.consultationId);
       }
 
       onlineUsers.delete(userId);

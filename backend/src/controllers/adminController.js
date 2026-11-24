@@ -194,6 +194,8 @@ exports.banUser = async (req, res) => {
   try {
     const { id } = req.params;
     await db.query('UPDATE users SET is_banned = true WHERE id = $1', [id]);
+    // Stop any running/queued consultation so a banned account isn't billed or served
+    await req.io?.endConsultationsFor?.({ userId: id }, 'account_banned').catch(() => {});
     res.json({ success: true, message: 'User banned' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -335,10 +337,17 @@ exports.rejectAstrologer = async (req, res) => {
   }
 };
 
+// Per-minute rates: positive rupees, capped to catch typos (e.g. 100000)
+const MAX_RATE = 10000;
+const badRate = (v) => v !== undefined && v !== null && v !== '' && !(Number.isFinite(Number(v)) && Number(v) > 0 && Number(v) <= MAX_RATE);
+
 exports.setAstrologerRates = async (req, res) => {
   try {
     const { id } = req.params;
     const { per_minute_rate_chat, per_minute_rate_call, per_minute_rate_video } = req.body;
+    if ([per_minute_rate_chat, per_minute_rate_call, per_minute_rate_video].some(badRate)) {
+      return res.status(400).json({ success: false, message: `Rates must be numbers between ₹1 and ₹${MAX_RATE} per minute` });
+    }
     const updates = [];
     const params = [];
 
@@ -381,6 +390,7 @@ exports.banAstrologer = async (req, res) => {
     );
     if (!result.rows.length) return res.status(404).json({ success: false, message: 'Astrologer not found' });
     await recordPresence(id, false);
+    await req.io?.endConsultationsFor?.({ astrologerId: id }, 'astrologer_banned').catch(() => {});
     res.json({ success: true, message: `${result.rows[0].display_name} has been banned` });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -582,83 +592,102 @@ exports.listTransactions = async (req, res) => {
   }
 };
 
+// Wallet mutations run in one transaction with the wallet row locked, so
+// concurrent admin actions (double clicks, two tabs) can't double-apply.
+async function walletTx(fn) {
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const out = await fn(client);
+    await client.query('COMMIT');
+    return out;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+class HttpError extends Error {
+  constructor(status, message) { super(message); this.status = status; }
+}
+const sendError = (res, err) => {
+  if (err instanceof HttpError) return res.status(err.status).json({ success: false, message: err.message });
+  console.error(err);
+  return res.status(500).json({ success: false, message: 'Server error' });
+};
+
 exports.manualCredit = async (req, res) => {
   try {
-    const { user_id, amount, description } = req.body;
-    if (!user_id || !amount || amount <= 0) {
+    const { user_id, description } = req.body;
+    const amount = Number(req.body.amount);
+    if (!user_id || !Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ success: false, message: 'user_id and positive amount required' });
     }
-
-    await db.query('INSERT INTO wallets (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [user_id]);
-    const walletRes = await db.query('SELECT * FROM wallets WHERE user_id = $1', [user_id]);
-    const w = walletRes.rows[0];
-
-    await db.query('UPDATE wallets SET balance = balance + $1, total_added = total_added + $1 WHERE user_id = $2', [amount, user_id]);
-    await db.query(`
-      INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, balance_before, balance_after, description, status)
-      VALUES ($1, $2, 'credit', $3, $4, $5, $6, 'success')
-    `, [w.id, user_id, amount, w.balance, parseFloat(w.balance) + parseFloat(amount), description || 'Admin credit']);
-
+    await walletTx(async (client) => {
+      const u = await client.query('SELECT id FROM users WHERE id = $1', [user_id]);
+      if (!u.rows.length) throw new HttpError(404, 'User not found');
+      await client.query('INSERT INTO wallets (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [user_id]);
+      const w = (await client.query('SELECT * FROM wallets WHERE user_id = $1 FOR UPDATE', [user_id])).rows[0];
+      await client.query('UPDATE wallets SET balance = balance + $1, total_added = total_added + $1 WHERE id = $2', [amount, w.id]);
+      await client.query(`
+        INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, balance_before, balance_after, description, status)
+        VALUES ($1, $2, 'credit', $3, $4, $5, $6, 'success')
+      `, [w.id, user_id, amount, w.balance, parseFloat(w.balance) + amount, description || 'Admin credit']);
+    });
     res.json({ success: true, message: `₹${amount} credited to user` });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    sendError(res, err);
   }
 };
 
 exports.manualDebit = async (req, res) => {
   try {
-    const { user_id, amount, description } = req.body;
-    if (!user_id || !amount || amount <= 0) {
+    const { user_id, description } = req.body;
+    const amount = Number(req.body.amount);
+    if (!user_id || !Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ success: false, message: 'user_id and positive amount required' });
     }
-
-    const walletRes = await db.query('SELECT * FROM wallets WHERE user_id = $1', [user_id]);
-    if (!walletRes.rows.length || parseFloat(walletRes.rows[0].balance) < amount) {
-      return res.status(400).json({ success: false, message: 'Insufficient balance' });
-    }
-    const w = walletRes.rows[0];
-
-    await db.query('UPDATE wallets SET balance = balance - $1, total_spent = total_spent + $1 WHERE user_id = $2', [amount, user_id]);
-    await db.query(`
-      INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, balance_before, balance_after, description, status)
-      VALUES ($1, $2, 'debit', $3, $4, $5, $6, 'success')
-    `, [w.id, user_id, amount, w.balance, parseFloat(w.balance) - parseFloat(amount), description || 'Admin debit']);
-
+    await walletTx(async (client) => {
+      const w = (await client.query('SELECT * FROM wallets WHERE user_id = $1 FOR UPDATE', [user_id])).rows[0];
+      if (!w || parseFloat(w.balance) < amount) throw new HttpError(400, 'Insufficient balance');
+      await client.query('UPDATE wallets SET balance = balance - $1, total_spent = total_spent + $1 WHERE id = $2', [amount, w.id]);
+      await client.query(`
+        INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, balance_before, balance_after, description, status)
+        VALUES ($1, $2, 'debit', $3, $4, $5, $6, 'success')
+      `, [w.id, user_id, amount, w.balance, parseFloat(w.balance) - amount, description || 'Admin debit']);
+    });
     res.json({ success: true, message: `₹${amount} debited from user` });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    sendError(res, err);
   }
 };
 
 exports.refundTransaction = async (req, res) => {
   try {
     const { id } = req.params;
-    const { reason } = req.body;
+    const { reason } = req.body || {};
+    const amount = await walletTx(async (client) => {
+      // Lock the original transaction row: a second concurrent refund waits here,
+      // then sees status = 'refunded' and is rejected.
+      const txRes = await client.query('SELECT * FROM wallet_transactions WHERE id = $1 FOR UPDATE', [id]);
+      if (!txRes.rows.length) throw new HttpError(404, 'Transaction not found');
+      const tx = txRes.rows[0];
+      if (tx.status === 'refunded') throw new HttpError(400, 'Already refunded');
+      if (tx.type !== 'debit') throw new HttpError(400, 'Only debit transactions can be refunded');
 
-    const txRes = await db.query('SELECT * FROM wallet_transactions WHERE id = $1', [id]);
-    if (!txRes.rows.length) return res.status(404).json({ success: false, message: 'Transaction not found' });
-    const tx = txRes.rows[0];
-
-    if (tx.status === 'refunded') return res.status(400).json({ success: false, message: 'Already refunded' });
-    if (tx.type !== 'debit') return res.status(400).json({ success: false, message: 'Only debit transactions can be refunded' });
-
-    const walletRes = await db.query('SELECT * FROM wallets WHERE user_id = $1', [tx.user_id]);
-    const w = walletRes.rows[0];
-
-    await db.query('UPDATE wallets SET balance = balance + $1, total_refunded = total_refunded + $1 WHERE user_id = $2', [tx.amount, tx.user_id]);
-    await db.query(`
-      INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, balance_before, balance_after, description, reference_type, status)
-      VALUES ($1, $2, 'refund', $3, $4, $5, $6, 'refund', 'success')
-    `, [w.id, tx.user_id, tx.amount, w.balance, parseFloat(w.balance) + parseFloat(tx.amount), reason || `Refund for transaction #${id}`]);
-
-    await db.query("UPDATE wallet_transactions SET status = 'refunded' WHERE id = $1", [id]);
-
-    res.json({ success: true, message: `₹${tx.amount} refunded` });
+      const w = (await client.query('SELECT * FROM wallets WHERE user_id = $1 FOR UPDATE', [tx.user_id])).rows[0];
+      await client.query('UPDATE wallets SET balance = balance + $1, total_refunded = total_refunded + $1 WHERE id = $2', [tx.amount, w.id]);
+      await client.query(`
+        INSERT INTO wallet_transactions (wallet_id, user_id, type, amount, balance_before, balance_after, description, reference_type, status)
+        VALUES ($1, $2, 'refund', $3, $4, $5, $6, 'refund', 'success')
+      `, [w.id, tx.user_id, tx.amount, w.balance, parseFloat(w.balance) + parseFloat(tx.amount), reason || `Refund for transaction #${id}`]);
+      await client.query("UPDATE wallet_transactions SET status = 'refunded' WHERE id = $1", [id]);
+      return tx.amount;
+    });
+    res.json({ success: true, message: `₹${amount} refunded` });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    sendError(res, err);
   }
 };
 

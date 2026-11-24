@@ -41,7 +41,9 @@ Rules: write entirely in ${language}, personalise with ${name}'s name, cite plan
     return response.data.candidates[0].content.parts[0].text;
   } catch (err) {
     console.error('AI generation error:', err.message);
-    return `## ${reportName} Report for ${name}\n\nYour personalized report is being prepared. Please check back shortly.`;
+    // No placeholder: nothing regenerates it later, so the caller must not
+    // consume the user's free/plan credit for an empty report.
+    return null;
   }
 }
 
@@ -209,6 +211,13 @@ exports.unlockReport = async (req, res) => {
 
     // Generate AI content
     const aiContent = await generateAiContent(report.name, report.inclusions, person, language || 'English');
+    if (!aiContent || !String(aiContent).trim()) {
+      return res.status(503).json({
+        success: false,
+        code: 'REPORT_GENERATION_FAILED',
+        message: "We couldn't generate your report right now. You have not been charged — please try again in a few minutes.",
+      });
+    }
 
     await client.query('BEGIN');
 
