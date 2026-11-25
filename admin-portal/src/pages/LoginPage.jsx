@@ -27,7 +27,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="text-4xl mb-3">🔮</div>
+          <img src={`${import.meta.env.BASE_URL}/brand/logo-192.png`.replace('//', '/')} alt="Grahvarta" className="w-24 h-24 mx-auto mb-3" />
           <h1 className="text-2xl font-bold text-white">Grahvarta Admin</h1>
           <p className="text-text-secondary text-sm mt-1">Sign in to your admin account</p>
         </div>

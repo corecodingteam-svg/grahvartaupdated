@@ -41,8 +41,13 @@ export default function Sidebar() {
   return (
     <aside className="w-60 min-h-screen bg-surface border-r border-border flex flex-col shrink-0">
       <div className="px-6 py-5 border-b border-border">
-        <span className="text-lg font-bold text-white">🔮 Grahvarta</span>
-        <p className="text-xs text-text-muted mt-0.5">Admin Panel</p>
+        <div className="flex items-center gap-3">
+          <img src={`${import.meta.env.BASE_URL}/brand/logo-96.png`.replace('//', '/')} alt="Grahvarta" className="w-10 h-10 shrink-0" />
+          <div>
+            <span className="text-lg font-bold text-white leading-tight">Grahvarta</span>
+            <p className="text-xs text-text-muted mt-0.5">Admin Panel</p>
+          </div>
+        </div>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
